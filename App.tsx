@@ -175,8 +175,8 @@ const App: React.FC = () => {
       />
       
       <main className={`flex-1 flex flex-col min-h-screen relative z-10 transition-all duration-300 lg:ml-72 ${isSidebarOpen ? 'translate-x-72 lg:translate-x-0' : 'translate-x-0'}`}>
-        <header className="px-4 md:px-8 py-4 lg:py-5 flex justify-between items-center border-b border-white/5 bg-[#050505]/80 backdrop-blur-xl sticky top-0 z-40 w-full">
-          <div className="flex items-center gap-3 lg:gap-8 flex-1 min-w-0">
+        <header className="px-4 md:px-8 py-4 lg:py-6 flex justify-between items-center border-b border-white/5 bg-[#050505]/90 backdrop-blur-xl sticky top-0 z-40 w-full">
+          <div className="flex items-center gap-4 lg:gap-6 flex-1 min-w-0">
             <button 
               onClick={() => setIsSidebarOpen(true)}
               className="lg:hidden p-2 -ml-2 text-white/70 hover:text-white hover:bg-white/5 rounded-xl transition-colors shrink-0"
@@ -184,39 +184,49 @@ const App: React.FC = () => {
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <div className="flex items-center gap-4 min-w-0">
-               {/* Header Logo */}
-               <div className="hidden md:block w-12 h-12 bg-white/5 rounded-xl border border-white/5 flex items-center justify-center shadow-lg shadow-black/20">
-                 <PompinoLogo className="w-8 h-8 text-white" />
-               </div>
-               
-               <div className="flex flex-col">
-                  <div className="flex items-center gap-3 mb-0.5">
-                    <span className="text-white/40 text-[9px] font-bold uppercase tracking-[0.2em] truncate">
-                      {activeTab === 'intelligence' ? 'Buscador Inteligente' : activeTab === 'crm' ? 'Gestión de Clientes' : 'Auditoría de Sistema'}
-                    </span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse hidden md:block shadow-[0_0_5px_#6366f1]"></span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                     <h1 className="text-xl md:text-2xl font-black text-white tracking-tight leading-none italic uppercase">
-                        POMPINO
-                     </h1>
-                     <span className="text-indigo-400/80 text-[9px] font-bold uppercase tracking-widest hidden sm:inline-block border-l border-white/10 pl-2">
-                        By Mati Rosas
-                     </span>
-                  </div>
-               </div>
+
+            {/* Brand Header Section */}
+            <div className="flex items-center gap-4">
+                {/* Logo Box */}
+                <div className="w-12 h-12 md:w-14 md:h-14 bg-white/[0.03] rounded-2xl border border-white/5 flex items-center justify-center shrink-0 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"></div>
+                    <PompinoLogo className="w-7 h-7 md:w-8 md:h-8 text-white relative z-10" />
+                </div>
+
+                {/* Text Layout */}
+                <div className="flex flex-col justify-center">
+                    {/* Top Row */}
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">
+                            {activeTab === 'intelligence' ? 'Buscador Inteligente' : activeTab === 'crm' ? 'Gestión CRM' : 'Operaciones'}
+                        </span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_#6366f1] animate-pulse"></span>
+                    </div>
+
+                    {/* Bottom Row */}
+                    <div className="flex items-baseline gap-3">
+                        <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter text-white uppercase leading-none drop-shadow-lg">
+                            POMPINO
+                        </h1>
+                        <div className="h-3 w-px bg-white/10 rotate-12"></div>
+                        <span className="text-indigo-400 text-[10px] md:text-[11px] font-bold uppercase tracking-[0.2em]">
+                            By Mati Rosas
+                        </span>
+                    </div>
+                </div>
             </div>
           </div>
           
-          <div className="flex-shrink-0 ml-4 pl-4 border-l border-white/10 hidden md:block">
-            <div className="flex items-center gap-3 group cursor-default">
-                <div className="text-right">
-                    <p className="text-[10px] font-black text-white uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{currentUser}</p>
-                    <p className="text-[9px] font-medium text-white/30 uppercase tracking-wide">Admin</p>
+          {/* User Profile */}
+          <div className="flex-shrink-0 ml-4 pl-6 border-l border-white/5 hidden md:block">
+            <div className="flex items-center gap-4 group cursor-default">
+                <div className="text-right leading-tight">
+                    <p className="text-[11px] font-black text-white uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{currentUser}</p>
+                    <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Admin</p>
                 </div>
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center font-black text-sm text-white shadow-inner">
-                    {currentUser.charAt(0)}
+                <div className="w-10 h-10 rounded-full bg-white/[0.03] border border-white/10 flex items-center justify-center font-black text-sm text-white shadow-inner relative overflow-hidden">
+                    <span className="relative z-10">{currentUser.charAt(0)}</span>
+                    <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/20 to-transparent opacity-50 group-hover:opacity-80 transition-opacity"></div>
                 </div>
             </div>
           </div>

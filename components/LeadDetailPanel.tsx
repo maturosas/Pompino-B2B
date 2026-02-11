@@ -5,7 +5,7 @@ import { Lead } from '../types';
 interface LeadDetailPanelProps {
   lead: Lead;
   onClose: () => void;
-  onUpdate: (updates: Partial<Lead>) => void;
+  onUpdate: (updates: Partial<Lead>, context?: string) => void;
 }
 
 const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpdate }) => {
@@ -19,27 +19,27 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
       {/* Panel */}
-      <div className="relative w-full max-w-xl bg-black border-l border-white/10 h-full flex flex-col animate-in slide-in-from-right duration-300">
-        <header className="p-8 border-b border-white/10 flex justify-between items-center bg-[#050505]">
-          <div>
-            <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em]">Ficha de Inteligencia B2B</span>
-            <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter leading-none mt-2">{lead.name}</h2>
+      <div className="relative w-full md:max-w-xl bg-black border-l border-white/10 h-full flex flex-col animate-in slide-in-from-right duration-300">
+        <header className="p-6 md:p-8 border-b border-white/10 flex justify-between items-center bg-[#050505]">
+          <div className="min-w-0 pr-4">
+            <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] block">Ficha de Inteligencia B2B</span>
+            <h2 className="text-2xl md:text-3xl font-black text-white uppercase italic tracking-tighter leading-none mt-2 truncate">{lead.name}</h2>
           </div>
-          <button onClick={onClose} className="p-3 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-colors">
+          <button onClick={onClose} className="p-3 bg-white/5 border border-white/10 rounded-2xl text-white hover:bg-white/10 transition-colors shrink-0">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scroll bg-black">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 md:space-y-10 custom-scroll bg-black">
           {/* Section: Información Comercial */}
           <section className="space-y-6">
             <h3 className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] border-b border-white/5 pb-2 italic">Perfil de Contacto</h3>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Persona de Contacto</label>
                 <input 
                   value={lead.contactName || ''} 
-                  onChange={(e) => onUpdate({ contactName: e.target.value })}
+                  onChange={(e) => onUpdate({ contactName: e.target.value }, 'Contacto')}
                   placeholder="Ej: Juan Perez..."
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none transition-all uppercase"
                 />
@@ -48,7 +48,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                 <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Estado del Prospecto</label>
                 <select 
                   value={lead.status} 
-                  onChange={(e) => onUpdate({ status: e.target.value as any })}
+                  onChange={(e) => onUpdate({ status: e.target.value as any }, 'Status')}
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none uppercase font-bold"
                 >
                   <option value="frio">FRIO</option>
@@ -59,12 +59,12 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
                 <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Responsable Interno</label>
                 <input 
                   value={lead.decisionMaker || ''} 
-                  onChange={(e) => onUpdate({ decisionMaker: e.target.value })}
+                  onChange={(e) => onUpdate({ decisionMaker: e.target.value }, 'Responsable')}
                   placeholder="Vendedor asignado..."
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none transition-all"
                 />
@@ -73,7 +73,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                 <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Potencial de Venta</label>
                 <select 
                   value={lead.businessPotential || 'medium'} 
-                  onChange={(e) => onUpdate({ businessPotential: e.target.value as any })}
+                  onChange={(e) => onUpdate({ businessPotential: e.target.value as any }, 'Potencial')}
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
                 >
                   <option value="low">BAJO</option>
@@ -83,7 +83,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div className="space-y-2">
                     <label className="text-[9px] font-black text-white/40 uppercase tracking-widest flex justify-between">
                         WhatsApp (Editable)
@@ -93,7 +93,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                     </label>
                     <input 
                         value={lead.phone || ''} 
-                        onChange={(e) => onUpdate({ phone: e.target.value })}
+                        onChange={(e) => onUpdate({ phone: e.target.value }, 'Teléfono')}
                         className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:border-white outline-none"
                     />
                 </div>
@@ -103,7 +103,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                     </label>
                     <input 
                         value={lead.email || ''} 
-                        onChange={(e) => onUpdate({ email: e.target.value })}
+                        onChange={(e) => onUpdate({ email: e.target.value }, 'Email')}
                         className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:border-white outline-none"
                     />
                 </div>
@@ -118,7 +118,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               </label>
               <input 
                 value={lead.deliveryZone || lead.location} 
-                onChange={(e) => onUpdate({ deliveryZone: e.target.value })}
+                onChange={(e) => onUpdate({ deliveryZone: e.target.value }, 'Zona')}
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
               />
             </div>
@@ -131,7 +131,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Condiciones de Pago</label>
               <input 
                 value={lead.paymentTerms || ''} 
-                onChange={(e) => onUpdate({ paymentTerms: e.target.value })}
+                onChange={(e) => onUpdate({ paymentTerms: e.target.value }, 'Pago')}
                 placeholder="Ej: Contado / 30 días / Consignación..."
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
               />
@@ -141,7 +141,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               <textarea 
                 rows={5}
                 value={lead.notes || ''} 
-                onChange={(e) => onUpdate({ notes: e.target.value })}
+                onChange={(e) => onUpdate({ notes: e.target.value }, 'Notas')}
                 placeholder="Escribe aquí detalles de la negociación, competencia que manejan, productos preferidos..."
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none resize-none italic"
               />
@@ -155,7 +155,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               <input 
                 type="date"
                 value={lead.lastContactDate || ''} 
-                onChange={(e) => onUpdate({ lastContactDate: e.target.value })}
+                onChange={(e) => onUpdate({ lastContactDate: e.target.value }, 'Fecha Contacto')}
                 className="bg-transparent border-none text-[10px] text-white font-black uppercase outline-none"
               />
             </div>
@@ -166,7 +166,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
           </section>
         </div>
 
-        <footer className="p-8 border-t border-white/10 bg-[#050505] flex gap-4">
+        <footer className="p-6 md:p-8 border-t border-white/10 bg-[#050505] flex gap-4">
            <a 
             href={`https://wa.me/${(lead.phone || '').replace(/\D/g, '')}`} 
             target="_blank"

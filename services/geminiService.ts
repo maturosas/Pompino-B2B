@@ -1,166 +1,163 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { Lead } from "../types";
 
 const getUserCoordinates = (): Promise<{ latitude: number; longitude: number } | null> => {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
-    
-    // Timeout de 5 segundos para evitar bloqueos en móviles
     const timeout = setTimeout(() => resolve(null), 5000);
-    
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        clearTimeout(timeout);
-        resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
-      },
-      () => {
-        clearTimeout(timeout);
-        resolve(null);
-      },
+      (pos) => { clearTimeout(timeout); resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); },
+      () => { clearTimeout(timeout); resolve(null); },
       { timeout: 5000 }
     );
   });
 };
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Helper para limpiar JSON corrupto del stream
+const cleanJsonString = (str: string) => {
+  return str.replace(/```json/g, '').replace(/```/g, '').trim();
+};
 
-export const scrapeLeads = async (zone: string, type: string, isDeepSearch: boolean = true): Promise<Lead[]> => {
+export const scrapeLeads = async (
+  zone: string, 
+  type: string, 
+  onLeadFound: (lead: Lead) => void,
+  onLog?: (msg: string) => void
+): Promise<void> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const userCoords = await getUserCoordinates();
+  
+  // Prompt optimizado con expansión semántica (sinónimos) y razonamiento geográfico
+  const prompt = `
+    Actúa como un Agente de Inteligencia Comercial B2B experto en scraping y búsqueda de datos.
 
-  // Helper para retry con fallback de modelo
-  const generateWithFallback = async (primaryModel: string, fallbackModel: string, prompt: string, tools: any = undefined) => {
-    try {
-      return await ai.models.generateContent({
-        model: primaryModel,
-        contents: prompt,
-        config: { tools }
-      });
-    } catch (error: any) {
-      // Detectamos error de cuota (429)
-      if (error.status === 429 || error.message?.includes('quota') || error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
-        console.warn(`Quota exceeded for ${primaryModel}, falling back to ${fallbackModel}`);
-        await wait(2000); // Pausa de 2s antes de intentar con el modelo de respaldo
-        return await ai.models.generateContent({
-          model: fallbackModel,
-          contents: prompt,
-          config: { tools }
-        });
-      }
-      throw error;
+    OBJETIVO: Identificar y extraer datos de clientes potenciales del rubro "${type}" ubicados en la zona de "${zone}".
+
+    PROTOCOLOS DE BÚSQUEDA (IMPORTANTE):
+    1. EXPANSIÓN SEMÁNTICA Y DE RUBRO:
+       - NO busques solo la palabra exacta "${type}".
+       - BUSCA ACTIVAMENTE: Sinónimos, variaciones (plurales/diminutivos), y categorías relacionadas del mismo ecosistema.
+       - EJEMPLO: Si el usuario pide "Bar", busca también: "Pubs", "Cervecerías", "Resto-bares", "Cantinas", "Tap Rooms", "Boliches", "Vinotecas".
+       - EJEMPLO: Si pide "Kiosco", busca "Drugstore", "Polirrubro", "Almacén", "Maxikiosco".
+
+    2. INTELIGENCIA GEOGRÁFICA:
+       - Cubre exhaustivamente la zona "${zone}".
+       - Si la zona es un barrio, considera calles principales y zonas comerciales aledañas dentro del mismo radio urbano.
+
+    INSTRUCCIONES DE SALIDA (STREAMING NDJSON):
+    - Genera resultados uno por uno en cuanto los encuentres.
+    - Formato: NDJSON (Newline Delimited JSON). Un objeto JSON válido por línea.
+    - SIN comas al final de línea. SIN bloques markdown (\`\`\`json).
+    - SIN texto introductorio.
+
+    SCHEMA JSON REQUERIDO:
+    {
+      "name": "Nombre Comercial Exacto",
+      "category": "Categoría específica detectada (Ej: 'Cervecería' en lugar de 'Bar')",
+      "phone": "Teléfono de contacto (prioridad)",
+      "email": "Email público (si existe)",
+      "location": "Dirección normalizada",
+      "whatsapp": "Solo números (opcional)"
     }
-  };
+
+    PRIORIDADES:
+    - Negocios activos actualmente.
+    - Datos de contacto (Teléfono/WhatsApp son vitales).
+  `;
 
   try {
-    // FASE 1: DESCUBRIMIENTO
-    // Intentamos Gemini 3 Pro primero para mayor calidad de búsqueda.
-    // Si falla por cuota, hacemos fallback automático a Gemini 3 Flash.
-    const discoveryPrompt = `Eres un experto en inteligencia de mercado y Lead Generation B2B. 
-      OBJETIVO: Encontrar la MAYOR cantidad posible de negocios del rubro "${type}" en la zona de "${zone}" y alrededores inmediatos.
-      
-      FUENTES OBLIGATORIAS DE BÚSQUEDA:
-      1. Google Maps (negocios locales verificados).
-      2. Directorios Profesionales (TripAdvisor, Yelp, Páginas Amarillas locales).
-      3. Redes Sociales (Instagram, Facebook Business, LinkedIn).
-      4. Listas de Cámaras de Comercio y Guías de Ocio locales.
-      
-      MISION CRÍTICA:
-      - No te detengas en los primeros 5 resultados. Busca listados extensos.
-      - Para cada negocio, necesito: Nombre exacto, Dirección, Teléfono (especifica si es WhatsApp), Email corporativo y Perfil de Instagram/Redes.
-      - Si encuentras pocos resultados, expande el radio de búsqueda a barrios o localidades vecinas para completar una base de datos robusta.
-      - PRIORIZA: Negocios activos con presencia digital.`;
-
-    const discoveryResponse = await generateWithFallback(
-      'gemini-3-pro-preview', 
-      'gemini-3-flash-preview', 
-      discoveryPrompt, 
-      [{ googleSearch: {} }]
-    );
-
-    const rawInformation = discoveryResponse.text || "No se encontró información básica.";
+    if (onLog) onLog(`> INICIANDO MOTOR SEMÁNTICO (Búsqueda expandida para "${type}")...`);
     
-    // FASE 2: ESTRUCTURACIÓN MASIVA
-    const structuringPrompt = `Analiza la siguiente información de prospección y genera un listado JSON exhaustivo. 
-      No omitas ningún negocio mencionado.
-      
-      INFORMACIÓN RECOLECTADA:
-      "${rawInformation}"
-      
-      REGLAS DE FORMATO:
-      - Genera un array de objetos.
-      - Si falta el email, deja el campo vacío.
-      - Si el teléfono parece celular, asume que es WhatsApp.
-      - Limpia los nombres de caracteres extraños.
-      
-      ESQUEMA JSON:
-      - name: Nombre comercial
-      - phone: Teléfono (con código de área)
-      - whatsapp: Solo números
-      - email: Email de contacto
-      - category: Sub-rubro específico
-      - location: Dirección completa en ${zone}`;
+    // Usamos Flash para velocidad máxima, o Pro si requerimos razonamiento complejo. 
+    // Flash es mucho más rápido para devolver el primer byte.
+    const responseStream = await ai.models.generateContentStream({
+      model: 'gemini-2.5-flash', 
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }] // Grounding activo
+      }
+    });
 
-    const structuringConfig = {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING },
-            phone: { type: Type.STRING },
-            whatsapp: { type: Type.STRING },
-            email: { type: Type.STRING },
-            category: { type: Type.STRING },
-            location: { type: Type.STRING },
-          },
-          required: ["name", "location"]
+    let buffer = '';
+    let foundCount = 0;
+
+    for await (const chunk of responseStream) {
+      const text = chunk.text;
+      if (!text) continue;
+      
+      buffer += text;
+
+      // Intentar procesar el buffer buscando objetos JSON completos
+      // Buscamos patrones que parezcan líneas JSON completas o bloques cerrados
+      const lines = buffer.split('\n');
+      
+      // Procesamos todas las líneas excepto la última (que podría estar incompleta)
+      // A menos que el stream haya terminado, pero aquí estamos en el loop.
+      const incompleteLine = lines.pop() || ''; 
+      
+      for (const line of lines) {
+        const cleanLine = cleanJsonString(line);
+        if (cleanLine.length < 5) continue; // Ignorar líneas vacías o ruido
+
+        try {
+          // Intentar parsear la línea
+          const data = JSON.parse(cleanLine);
+          
+          if (data && data.name) {
+            const lead: Lead = {
+              ...data,
+              id: `stream-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+              status: 'frio',
+              isClient: false,
+              savedAt: Date.now(),
+              whatsapp: data.whatsapp || (data.phone ? data.phone.replace(/\D/g, '') : ""),
+              notes: `Capturado vía Smart Search (${data.category || type})`
+            };
+            
+            onLeadFound(lead);
+            foundCount++;
+            if (foundCount % 3 === 0 && onLog) onLog(`> ${foundCount} leads identificados...`);
+          }
+        } catch (e) {
+          // Si falla el parseo, puede ser que la línea no sea JSON puro todavía.
+          // En un escenario NDJSON estricto esto no debería pasar mucho si el modelo obedece.
+          // Ignoramos el error silenciosamente para no detener el flujo.
         }
       }
-    };
+      
+      buffer = incompleteLine; // Guardamos lo que sobró para el siguiente chunk
+    }
 
-    let structuringResponse;
-    try {
-        structuringResponse = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: structuringPrompt,
-            config: structuringConfig
-        });
-    } catch (e: any) {
-        // Reintento simple con pausa para la fase de estructuración
-        if (e.status === 429 || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED')) {
-             await wait(3000);
-             structuringResponse = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: structuringPrompt,
-                config: structuringConfig
-             });
-        } else {
-            throw e;
+    // Procesar el remanente del buffer al final
+    if (buffer.trim()) {
+      try {
+        const cleanLine = cleanJsonString(buffer);
+        const data = JSON.parse(cleanLine);
+        if (data && data.name) {
+             const lead: Lead = {
+              ...data,
+              id: `stream-last-${Date.now()}`,
+              status: 'frio',
+              isClient: false,
+              savedAt: Date.now(),
+              whatsapp: data.whatsapp || (data.phone ? data.phone.replace(/\D/g, '') : ""),
+              notes: `Capturado vía Smart Search (${data.category || type})`
+            };
+            onLeadFound(lead);
         }
+      } catch (e) {}
     }
 
-    const responseText = structuringResponse.text;
-    if (!responseText) throw new Error("La IA no pudo procesar el volumen de datos.");
+    if (onLog) onLog(`> BÚSQUEDA FINALIZADA. Total: ${foundCount} resultados.`);
 
-    const rawData = JSON.parse(responseText);
-
-    // Mapeo final y enriquecimiento
-    return rawData.map((item: any, index: number) => ({
-      ...item,
-      id: `lead-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
-      status: 'frio',
-      isClient: false,
-      notes: '',
-      whatsapp: item.whatsapp || (item.phone ? item.phone.replace(/\D/g, '') : ""),
-      savedAt: Date.now()
-    }));
-  } catch (e: any) {
-    console.error("Critical Scraping Error:", e);
-    if (e.message?.includes("quota") || e.message?.includes("exhausted") || e.status === 429 || e.message?.includes("429")) {
-      throw new Error("⚠️ Sistema sobrecargado (Quota Limit). Espera 1 min o intenta otra zona.");
+  } catch (error: any) {
+    console.error("Stream Error:", error);
+    if (onLog) onLog(`> ERROR DE STREAM: ${error.message}`);
+    
+    // Manejo de cuota simple
+    if (error.status === 429 || error.message?.includes('quota')) {
+        if (onLog) onLog(`> CUOTA EXCEDIDA. Reintentando en modo lento...`);
+        throw new Error("Quota Exceeded");
     }
-    throw new Error("Error en la red de inteligencia. Reintenta con términos más generales.");
   }
 };

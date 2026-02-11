@@ -32,3 +32,13 @@ export interface PipelineState {
 export interface CRMState {
   savedLeads: Lead[];
 }
+
+export type User = 'Mati' | 'Diego' | 'Gaston';
+
+export interface OperationLog {
+  id: string;
+  user: User;
+  action: 'SEARCH' | 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE';
+  details: string;
+  timestamp: number;
+}

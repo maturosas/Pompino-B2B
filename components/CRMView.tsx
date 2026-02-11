@@ -7,18 +7,17 @@ interface CRMViewProps {
   leads: Lead[];
   onRemove: (id: string) => void;
   onUpdateLead: (id: string, updates: Partial<Lead>) => void;
+  onDetailedUpdate: (id: string, updates: Partial<Lead>, context: string) => void;
   onAddManualLead: (lead: Lead) => void;
+  activeFolder: string;
 }
 
 type SortKey = 'name' | 'category' | 'status' | 'savedAt' | 'followUpDate';
-type ClientFilter = 'all' | 'clients' | 'leads';
 
-const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddManualLead }) => {
+const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDetailedUpdate, onAddManualLead, activeFolder }) => {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('savedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [clientFilter, setClientFilter] = useState<ClientFilter>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   
@@ -28,6 +27,12 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
 
   const processedLeads = useMemo(() => {
     let result = [...leads];
+    
+    // Folder Filtering
+    if (activeFolder !== 'all') {
+      result = result.filter(l => l.status === activeFolder);
+    }
+
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(l => 
@@ -38,9 +43,6 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
         (l.contactName || '').toLowerCase().includes(q)
       );
     }
-    if (statusFilter !== 'all') result = result.filter(l => l.status === statusFilter);
-    if (clientFilter === 'clients') result = result.filter(l => l.status === 'client');
-    else if (clientFilter === 'leads') result = result.filter(l => l.status !== 'client');
 
     result.sort((a, b) => {
       let valA: any = a[sortKey as keyof Lead] || '';
@@ -50,7 +52,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
       return 0;
     });
     return result;
-  }, [leads, search, sortKey, sortOrder, statusFilter, clientFilter]);
+  }, [leads, search, sortKey, sortOrder, activeFolder]);
 
   const handleManualAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +76,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
         escape(l.phone), 
         escape(l.email), 
         escape(l.status), 
-        escape(l.notes),
+        escape(l.notes), 
         escape(l.decisionMaker),
         escape(l.followUpDate)
       ].join(","))
@@ -103,41 +105,111 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + location)}`;
   };
 
+  const getFolderName = (id: string) => {
+      switch(id) {
+          case 'frio': return 'Prospectos Fríos';
+          case 'contacted': return 'Contactados';
+          case 'negotiation': return 'En Negociación';
+          case 'client': return 'Clientes Activos';
+          default: return 'Todos los Registros';
+      }
+  }
+
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
+      {/* Header with Active Folder Title */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-2 border-b border-white/5 gap-2">
+        <h2 className="text-lg md:text-xl font-black italic uppercase tracking-tighter text-white/90">
+            {getFolderName(activeFolder)} <span className="text-white/30 text-sm not-italic font-bold ml-2">({processedLeads.length})</span>
+        </h2>
+      </div>
+
       {/* Compact Toolbar */}
       <div className="p-3 border border-white/10 rounded-xl bg-[#0a0a0a] shadow-xl">
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
           <div className="flex-1 min-w-0">
             <input 
               type="text" 
-              placeholder="FILTRAR..." 
+              placeholder="BUSCAR EN CARPETA..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-9 bg-black border border-white/10 px-3 rounded-lg text-[10px] font-bold text-white outline-none focus:border-white uppercase placeholder:text-white/20" 
+              className="w-full h-10 md:h-9 bg-black border border-white/10 px-3 rounded-lg text-xs md:text-[10px] font-bold text-white outline-none focus:border-white uppercase placeholder:text-white/20" 
             />
           </div>
-          <div className="flex gap-2 items-center overflow-x-auto pb-1 lg:pb-0">
-             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 bg-black border border-white/10 px-2 rounded-lg text-[9px] font-black text-white uppercase outline-none focus:border-white min-w-[100px]">
-              <option value="all">TODOS</option>
-              <option value="frio">FRIO</option>
-              <option value="contacted">CONTACTADO</option>
-              <option value="negotiation">NEGOCIACION</option>
-              <option value="client">CLIENTE</option>
-            </select>
-            <button onClick={() => setIsAddModalOpen(true)} className="h-9 px-3 border border-white/40 text-white text-[9px] font-black uppercase rounded-lg hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 whitespace-nowrap">
+          <div className="flex gap-2 items-center">
+            <button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none h-10 md:h-9 px-3 border border-white/40 text-white text-[10px] font-black uppercase rounded-lg hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 whitespace-nowrap">
                <span>+ NUEVO</span>
             </button>
-            <button onClick={handleExportCSV} className="h-9 px-3 bg-white text-black text-[9px] font-black uppercase rounded-lg hover:bg-black hover:text-white border border-white transition-all flex items-center justify-center gap-1 whitespace-nowrap">
+            <button onClick={handleExportCSV} className="flex-1 md:flex-none h-10 md:h-9 px-3 bg-white text-black text-[10px] font-black uppercase rounded-lg hover:bg-black hover:text-white border border-white transition-all flex items-center justify-center gap-1 whitespace-nowrap">
                <span>CSV</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Ultra Compact Unified Table */}
+      {/* Unified List View (Cards on Mobile, Table on Desktop) */}
       <div className="border border-white/10 rounded-xl overflow-hidden bg-[#0a0a0a]">
-        <div className="overflow-x-auto custom-scroll">
+        
+        {/* MOBILE CARDS VIEW */}
+        <div className="md:hidden bg-black/50 p-3 space-y-3">
+             {processedLeads.length === 0 ? (
+                <div className="py-12 text-center text-white/10 font-black uppercase tracking-[0.2em] text-[10px]">Carpeta vacía</div>
+             ) : (
+                processedLeads.map(lead => (
+                   <div key={lead.id} className="bg-[#0a0a0a] border border-white/10 rounded-lg p-4 space-y-3 relative group active:border-white/30 transition-colors">
+                      {/* Card Header */}
+                      <div className="flex justify-between items-start pr-6">
+                         <div onClick={() => setSelectedLead(lead)} className="cursor-pointer">
+                            <h3 className="font-bold text-white text-sm uppercase leading-tight">{lead.name}</h3>
+                            <p className="text-[10px] text-white/40 uppercase font-black mt-0.5">{lead.category}</p>
+                         </div>
+                         <button onClick={() => onRemove(lead.id)} className="absolute top-3 right-3 text-white/10 hover:text-red-500 p-1">
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                         </button>
+                      </div>
+
+                      {/* Contact Fields */}
+                      <div className="space-y-2">
+                         <input 
+                            value={lead.contactName || ''} 
+                            onChange={(e) => onUpdateLead(lead.id, { contactName: e.target.value })}
+                            placeholder="CONTACTO..."
+                            className="w-full bg-white/5 border border-transparent focus:border-white/20 rounded px-2 py-1.5 text-xs text-white uppercase placeholder:text-white/10"
+                         />
+                         <div className="flex gap-2">
+                             <input 
+                                value={lead.phone} 
+                                onChange={(e) => onUpdateLead(lead.id, { phone: e.target.value, whatsapp: e.target.value.replace(/\D/g, '') })}
+                                placeholder="TELÉFONO..."
+                                className="flex-1 bg-white/5 border border-transparent focus:border-white/20 rounded px-2 py-1.5 text-xs text-white font-mono placeholder:text-white/10"
+                             />
+                             {lead.phone && <a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" className="bg-[#25D366]/20 text-[#25D366] px-2 rounded flex items-center justify-center font-black text-[10px]">WA</a>}
+                         </div>
+                      </div>
+
+                      {/* Status & Actions */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                         <select 
+                            value={lead.status} 
+                            onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })} 
+                            className={`flex-1 h-8 rounded px-2 text-[9px] font-black uppercase ${getStatusStyles(lead.status)}`}
+                         >
+                            <option value="frio">FRIO</option>
+                            <option value="contacted">CONTACTADO</option>
+                            <option value="negotiation">EN PROCESO</option>
+                            <option value="client">CLIENTE</option>
+                         </select>
+                         <button onClick={() => setSelectedLead(lead)} className="px-3 h-8 bg-white/5 border border-white/10 rounded text-[9px] font-bold text-white/50 uppercase">
+                             Detalles
+                         </button>
+                      </div>
+                   </div>
+                ))
+             )}
+        </div>
+
+        {/* DESKTOP TABLE VIEW */}
+        <div className="hidden md:block overflow-x-auto custom-scroll">
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-white/5 text-white/40 text-[9px] font-black uppercase tracking-widest border-b border-white/10">
@@ -151,7 +223,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
             </thead>
             <tbody className="divide-y divide-white/5">
               {processedLeads.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-white/10 font-black uppercase tracking-[0.5em] text-[10px]">Sin datos en archivo</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-white/10 font-black uppercase tracking-[0.5em] text-[10px]">Carpeta vacía</td></tr>
               ) : (
                 processedLeads.map((lead) => (
                   <tr key={lead.id} className={`hover:bg-white/[0.03] transition-colors group ${lead.status === 'client' ? 'bg-white/[0.02]' : ''}`}>
@@ -231,19 +303,29 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
         </div>
       </div>
       
-      {selectedLead && <LeadDetailPanel lead={selectedLead} onClose={() => setSelectedLead(null)} onUpdate={(u) => { onUpdateLead(selectedLead.id, u); setSelectedLead(prev => prev ? {...prev, ...u} : null); }} />}
+      {selectedLead && (
+        <LeadDetailPanel 
+            lead={selectedLead} 
+            onClose={() => setSelectedLead(null)} 
+            onUpdate={(u, ctx) => { 
+                if (ctx) onDetailedUpdate(selectedLead.id, u, ctx);
+                else onUpdateLead(selectedLead.id, u); // Fallback for simple updates
+                setSelectedLead(prev => prev ? {...prev, ...u} : null); 
+            }} 
+        />
+      )}
       
       {isAddModalOpen && (
          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-             <div className="bg-[#0a0a0a] border border-white/20 rounded-xl w-full max-w-lg p-6 shadow-2xl">
+             <div className="bg-[#0a0a0a] border border-white/20 rounded-xl w-full max-w-lg p-6 shadow-2xl animate-in zoom-in-95 duration-200">
                  <h3 className="text-lg font-black text-white uppercase mb-4 italic tracking-tight">Nuevo Prospecto</h3>
                  <form onSubmit={handleManualAddSubmit} className="space-y-4">
-                     <div className="grid grid-cols-2 gap-3">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                          <input required placeholder="Entidad / Razón Social" value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} className="h-9 bg-black border border-white/10 px-3 rounded-lg text-xs text-white outline-none focus:border-white" />
                          <input placeholder="Rubro" value={newLead.category} onChange={e => setNewLead({...newLead, category: e.target.value})} className="h-9 bg-black border border-white/10 px-3 rounded-lg text-xs text-white outline-none focus:border-white" />
                          <input placeholder="Persona Contacto" value={newLead.contactName} onChange={e => setNewLead({...newLead, contactName: e.target.value})} className="h-9 bg-black border border-white/10 px-3 rounded-lg text-xs text-white outline-none focus:border-white" />
                          <input placeholder="Teléfono" value={newLead.phone} onChange={e => setNewLead({...newLead, phone: e.target.value})} className="h-9 bg-black border border-white/10 px-3 rounded-lg text-xs text-white outline-none focus:border-white" />
-                         <div className="col-span-2">
+                         <div className="md:col-span-2">
                              <input placeholder="Ubicación" value={newLead.location} onChange={e => setNewLead({...newLead, location: e.target.value})} className="w-full h-9 bg-black border border-white/10 px-3 rounded-lg text-xs text-white outline-none focus:border-white" />
                          </div>
                      </div>

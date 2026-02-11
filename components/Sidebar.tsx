@@ -1,18 +1,37 @@
 
 import React from 'react';
+import { Lead, User } from '../types';
 
 interface SidebarProps {
-  activeTab: 'intelligence' | 'crm';
-  setActiveTab: (tab: 'intelligence' | 'crm') => void;
-  crmCount: number;
+  activeTab: 'intelligence' | 'crm' | 'operations';
+  setActiveTab: (tab: 'intelligence' | 'crm' | 'operations') => void;
+  activeFolder: string;
+  setActiveFolder: (folder: string) => void;
+  savedLeads: Lead[];
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
+  currentUser: User;
+  onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, crmCount, isOpen, setIsOpen }) => {
-  const tabs = [
-    { id: 'intelligence', label: 'RASTREO', desc: 'Buscador B2B' },
-    { id: 'crm', label: 'ARCHIVO', desc: 'Base de Datos' },
+const Sidebar: React.FC<SidebarProps> = ({ 
+  activeTab, 
+  setActiveTab, 
+  activeFolder,
+  setActiveFolder,
+  savedLeads, 
+  isOpen, 
+  setIsOpen,
+  currentUser,
+  onLogout
+}) => {
+  
+  const folders = [
+    { id: 'all', label: 'TODOS', count: savedLeads.length },
+    { id: 'frio', label: 'FRIO', count: savedLeads.filter(l => l.status === 'frio').length },
+    { id: 'contacted', label: 'CONTACTADO', count: savedLeads.filter(l => l.status === 'contacted').length },
+    { id: 'negotiation', label: 'EN PROCESO', count: savedLeads.filter(l => l.status === 'negotiation').length },
+    { id: 'client', label: 'CLIENTES', count: savedLeads.filter(l => l.status === 'client').length },
   ];
 
   return (
@@ -40,42 +59,112 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, crmCount, is
         </button>
       </div>
       
-      <nav className="space-y-2 flex-1 overflow-y-auto">
+      <nav className="space-y-2 flex-1 overflow-y-auto custom-scroll pr-2">
         <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] mb-4 px-2 italic">Control Panel</p>
-        {tabs.map((tab) => (
+        
+        {/* Tab RASTREO */}
+        <button
+          onClick={() => setActiveTab('intelligence')}
+          className={`w-full text-left px-4 py-4 rounded-xl transition-all duration-200 group relative border flex items-center justify-between mb-2 ${
+            activeTab === 'intelligence' 
+              ? 'bg-white text-black border-white' 
+              : 'text-white/40 hover:text-white border-transparent hover:bg-white/5'
+          }`}
+        >
+          <div className="flex flex-col min-w-0">
+            <span className="font-black text-[11px] uppercase tracking-wider">RASTREO</span>
+            <span className={`text-[7px] font-bold uppercase tracking-widest truncate ${activeTab === 'intelligence' ? 'text-black/50' : 'text-white/10'}`}>
+              Buscador B2B
+            </span>
+          </div>
+        </button>
+
+        {/* Tab ARCHIVO con Folders */}
+        <div className="space-y-1">
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab('crm')}
             className={`w-full text-left px-4 py-4 rounded-xl transition-all duration-200 group relative border flex items-center justify-between ${
-              activeTab === tab.id 
-                ? 'bg-white text-black border-white' 
+              activeTab === 'crm' 
+                ? 'bg-white/10 text-white border-white/20' 
                 : 'text-white/40 hover:text-white border-transparent hover:bg-white/5'
             }`}
           >
             <div className="flex flex-col min-w-0">
-              <span className="font-black text-[11px] uppercase tracking-wider">{tab.label}</span>
-              <span className={`text-[7px] font-bold uppercase tracking-widest truncate ${activeTab === tab.id ? 'text-black/50' : 'text-white/10'}`}>
-                {tab.desc}
+              <span className="font-black text-[11px] uppercase tracking-wider">ARCHIVO</span>
+              <span className={`text-[7px] font-bold uppercase tracking-widest truncate ${activeTab === 'crm' ? 'text-white/40' : 'text-white/10'}`}>
+                Base de Datos
               </span>
             </div>
-            {tab.id === 'crm' && crmCount > 0 && (
-              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ml-2 ${
-                activeTab === tab.id ? 'bg-black text-white' : 'bg-white/10 text-white/50'
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded shrink-0 ml-2 ${
+                activeTab === 'crm' ? 'bg-white text-black' : 'bg-white/10 text-white/50'
               }`}>
-                {crmCount}
-              </span>
-            )}
+                {savedLeads.length}
+            </span>
           </button>
-        ))}
+
+          {/* Folders */}
+          {activeTab === 'crm' && (
+            <div className="pl-4 space-y-1 mt-2 animate-in slide-in-from-left-2 duration-300">
+              {folders.map(folder => (
+                <button
+                  key={folder.id}
+                  onClick={() => { setActiveFolder(folder.id); if(window.innerWidth < 1024) setIsOpen(false); }}
+                  className={`w-full text-left px-4 py-2.5 rounded-lg transition-all flex items-center justify-between ${
+                    activeFolder === folder.id
+                      ? 'bg-white text-black shadow-lg shadow-white/10'
+                      : 'text-white/50 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                     {folder.id === 'all' && <span className="opacity-50">📂</span>}
+                     {folder.id === 'frio' && <span className="opacity-50">❄️</span>}
+                     {folder.id === 'contacted' && <span className="opacity-50">📨</span>}
+                     {folder.id === 'negotiation' && <span className="opacity-50">🤝</span>}
+                     {folder.id === 'client' && <span className="opacity-50">⭐</span>}
+                     {folder.label}
+                  </span>
+                  <span className={`text-[8px] font-bold px-1.5 rounded ${
+                    activeFolder === folder.id ? 'bg-black/10 text-black' : 'bg-white/10 text-white/30'
+                  }`}>
+                    {folder.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tab OPERATIONS */}
+        <button
+          onClick={() => setActiveTab('operations')}
+          className={`w-full text-left px-4 py-4 rounded-xl transition-all duration-200 group relative border flex items-center justify-between mt-2 ${
+            activeTab === 'operations' 
+              ? 'bg-white text-black border-white' 
+              : 'text-white/40 hover:text-white border-transparent hover:bg-white/5'
+          }`}
+        >
+          <div className="flex flex-col min-w-0">
+            <span className="font-black text-[11px] uppercase tracking-wider">OPERACIONES</span>
+            <span className={`text-[7px] font-bold uppercase tracking-widest truncate ${activeTab === 'operations' ? 'text-black/50' : 'text-white/10'}`}>
+              Audit Logs
+            </span>
+          </div>
+        </button>
+
       </nav>
 
       <div className="mt-auto pt-6 border-t border-white/5">
-        <div className="p-4 rounded-xl bg-white/[0.02] text-center">
-          <p className="text-[7px] font-black text-white/10 uppercase tracking-[0.3em] mb-2">Tailored for</p>
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
-            <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">Bzs Grupo bebidas</span>
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white/20 to-white/5 border border-white/10 flex items-center justify-center font-black text-white">
+            {currentUser.charAt(0)}
           </div>
+          <div className="flex-1 min-w-0">
+             <p className="text-[10px] font-black text-white uppercase">{currentUser}</p>
+             <button onClick={onLogout} className="text-[8px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wide">Cerrar Sesión</button>
+          </div>
+        </div>
+        <div className="mt-4 text-center">
+             <p className="text-[7px] font-black text-white/10 uppercase tracking-[0.3em]">Tailored for BZS</p>
         </div>
       </div>
     </aside>

@@ -6,13 +6,14 @@ interface CRMViewProps {
   leads: Lead[];
   onRemove: (id: string) => void;
   onUpdateLead: (id: string, updates: Partial<Lead>) => void;
+  onAddManualLead: (lead: Lead) => void;
 }
 
 type SortKey = 'name' | 'category' | 'status' | 'savedAt' | 'followUpDate';
 type DateFilter = 'all' | 'today' | 'this-week' | 'upcoming' | 'overdue' | 'none';
 type ClientFilter = 'all' | 'clients' | 'leads';
 
-const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
+const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddManualLead }) => {
   const [search, setSearch] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('savedAt');
@@ -20,8 +21,21 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [clientFilter, setClientFilter] = useState<ClientFilter>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Modal manual lead state
+  const [newLead, setNewLead] = useState<Partial<Lead>>({
+    name: '',
+    category: '',
+    location: '',
+    phone: '',
+    email: '',
+    website: '',
+    status: 'discovered',
+    isClient: false
+  });
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -51,7 +65,6 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
     nextWeek.setDate(now.getDate() + 7);
     const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
-    // Multi-field search logic
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(l => 
@@ -66,7 +79,6 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
     }
 
     if (statusFilter !== 'all') result = result.filter(l => l.status === statusFilter);
-    
     if (clientFilter === 'clients') result = result.filter(l => l.isClient);
     else if (clientFilter === 'leads') result = result.filter(l => !l.isClient);
 
@@ -116,6 +128,43 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
     else { setSortKey(key); setSortOrder('asc'); }
   };
 
+  const handleExportCSV = () => {
+    if (processedLeads.length === 0) return;
+    
+    const headers = ["Nombre", "Categoría", "Ubicación", "Teléfono", "Email", "Web", "Status", "Cliente", "Notas", "Seguimiento"];
+    const rows = processedLeads.map(l => [
+      l.name, l.category, l.location, l.phone, l.email, l.website || "", 
+      l.status, l.isClient ? "SI" : "NO", l.notes || "", l.followUpDate || ""
+    ]);
+    
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `pompino_b2b_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleManualAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLead.name) return;
+    
+    const fullLead: Lead = {
+      ...newLead as Lead,
+      id: `manual-${Date.now()}`,
+      savedAt: Date.now(),
+    };
+    
+    onAddManualLead(fullLead);
+    setIsAddModalOpen(false);
+    setNewLead({
+      name: '', category: '', location: '', phone: '', email: '', website: '', status: 'discovered', isClient: false
+    });
+  };
+
   const handleSendEmail = (lead: Lead) => {
     if (!lead.email || lead.email.includes('no-email')) {
       alert("No se ha detectado un email válido.");
@@ -129,18 +178,18 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
   const getFollowUpStyles = (date?: string) => {
     if (!date) return 'text-white/10 border-white/5 bg-transparent';
     const today = new Date().toISOString().split('T')[0];
-    if (date < today) return 'text-white border-white bg-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)] font-black ring-1 ring-white/50'; // CRÍTICO
-    if (date === today) return 'text-white border-white/60 bg-white/10 font-bold'; // HOY
-    return 'text-white/40 border-white/10 bg-transparent'; // FUTURO
+    if (date < today) return 'text-white border-white bg-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)] font-black ring-1 ring-white/50';
+    if (date === today) return 'text-white border-white/60 bg-white/10 font-bold';
+    return 'text-white/40 border-white/10 bg-transparent';
   };
 
   const getStatusStyles = (status: string) => {
     switch (status) {
-      case 'closed': return 'text-white border-white bg-white/30 font-black'; // EXIT
-      case 'contacted': return 'text-white border-white/60 bg-white/10 font-bold'; // GEST
-      case 'qualified': return 'text-white/70 border-white/30 bg-white/[0.04]'; // QUAL
+      case 'closed': return 'text-white border-white bg-white/30 font-black';
+      case 'contacted': return 'text-white border-white/60 bg-white/10 font-bold';
+      case 'qualified': return 'text-white/70 border-white/30 bg-white/[0.04]';
       case 'discovered': 
-      default: return 'text-white/30 border-white/10 bg-transparent'; // DESC
+      default: return 'text-white/30 border-white/10 bg-transparent';
     }
   };
 
@@ -182,59 +231,58 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
           </div>
           
           <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-            <div className="flex flex-col gap-1">
-              <label className="text-[7px] font-black text-white/20 uppercase tracking-[0.3em] ml-1">Estado</label>
-              <select 
-                value={statusFilter} 
-                onChange={(e) => setStatusFilter(e.target.value)} 
-                className={`h-10 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${statusFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
-              >
-                <option value="all">TODOS LOS ESTADOS</option>
-                <option value="discovered">DESCUBIERTO</option>
-                <option value="qualified">CALIFICADO</option>
-                <option value="contacted">EN GESTIÓN</option>
-                <option value="closed">ÉXITO COMERCIAL</option>
-              </select>
-            </div>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)} 
+              className={`h-12 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${statusFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
+            >
+              <option value="all">TODOS LOS ESTADOS</option>
+              <option value="discovered">DESCUBIERTO</option>
+              <option value="qualified">CALIFICADO</option>
+              <option value="contacted">EN GESTIÓN</option>
+              <option value="closed">ÉXITO COMERCIAL</option>
+            </select>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[7px] font-black text-white/20 uppercase tracking-[0.3em] ml-1">Segmentación</label>
-              <select 
-                value={clientFilter} 
-                onChange={(e) => setClientFilter(e.target.value as ClientFilter)} 
-                className={`h-10 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${clientFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
-              >
-                <option value="all">TODOS LOS REGISTROS</option>
-                <option value="clients">CARTERA CLIENTES</option>
-                <option value="leads">SOLO PROSPECTOS</option>
-              </select>
-            </div>
+            <select 
+              value={clientFilter} 
+              onChange={(e) => setClientFilter(e.target.value as ClientFilter)} 
+              className={`h-12 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${clientFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
+            >
+              <option value="all">TODOS LOS REGISTROS</option>
+              <option value="clients">CARTERA CLIENTES</option>
+              <option value="leads">SOLO PROSPECTOS</option>
+            </select>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[7px] font-black text-white/20 uppercase tracking-[0.3em] ml-1">Calendario</label>
-              <select 
-                value={dateFilter} 
-                onChange={(e) => setDateFilter(e.target.value as DateFilter)} 
-                className={`h-10 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${dateFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
-              >
-                <option value="all">TODAS LAS FECHAS</option>
-                <option value="overdue">VENCIDOS (!) </option>
-                <option value="today">PLAN PARA HOY</option>
-                <option value="this-week">PRÓX. 7 DÍAS</option>
-                <option value="upcoming">FUTURO CERCANO</option>
-                <option value="none">SIN ASIGNAR</option>
-              </select>
-            </div>
+            <select 
+              value={dateFilter} 
+              onChange={(e) => setDateFilter(e.target.value as DateFilter)} 
+              className={`h-12 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${dateFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
+            >
+              <option value="all">TODAS LAS FECHAS</option>
+              <option value="overdue">VENCIDOS (!) </option>
+              <option value="today">PLAN PARA HOY</option>
+              <option value="this-week">PRÓX. 7 DÍAS</option>
+              <option value="upcoming">FUTURO CERCANO</option>
+              <option value="none">SIN ASIGNAR</option>
+            </select>
 
-            {isAnyFilterActive && (
-              <button 
-                onClick={resetFilters}
-                className="self-end h-10 px-4 border-2 border-white bg-white text-black text-[9px] font-black uppercase rounded-xl hover:bg-black hover:text-white transition-all flex items-center gap-2"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                RESETEAR
-              </button>
-            )}
+            <div className="h-12 w-px bg-white/10 mx-2 hidden xl:block"></div>
+
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="h-12 px-6 border-2 border-white/40 text-white text-[10px] font-black uppercase rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 shadow-lg"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+              NUEVO
+            </button>
+
+            <button 
+              onClick={handleExportCSV}
+              className="h-12 px-6 border-2 border-white bg-white text-black text-[10px] font-black uppercase rounded-xl hover:bg-black hover:text-white transition-all flex items-center gap-2 shadow-lg"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M7 10l5 5m0 0l5-5m-5 5V3" /></svg>
+              EXPORTAR CSV
+            </button>
           </div>
         </div>
       </div>
@@ -268,7 +316,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
               ) : (
                 processedLeads.map((lead) => (
                   <tr key={lead.id} className={`group transition-all hover:bg-white/[0.06] ${lead.isClient ? 'bg-white/[0.03]' : 'bg-black'}`}>
-                    <td className="px-5 py-1.5 leading-none">
+                    <td className="px-5 py-2 leading-none">
                       <div className="font-black text-white text-[12px] uppercase italic truncate max-w-[220px] mb-0.5 group-hover:translate-x-1 transition-transform">{lead.name}</div>
                       <div className="flex items-center gap-2">
                         <span className="text-[8px] font-black text-white/60 uppercase tracking-tighter">{lead.category}</span>
@@ -277,7 +325,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
                       </div>
                     </td>
                     
-                    <td className="px-2 py-1.5 text-center">
+                    <td className="px-2 py-2 text-center">
                       <button 
                         onClick={() => onUpdateLead(lead.id, { isClient: !lead.isClient })} 
                         className={`w-8 h-4 rounded-full relative border-2 transition-all ${lead.isClient ? 'bg-white border-white' : 'bg-black border-white/20 hover:border-white/50'}`}
@@ -286,7 +334,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
                       </button>
                     </td>
 
-                    <td className="px-5 py-1.5">
+                    <td className="px-5 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex flex-col gap-0 flex-1 overflow-hidden">
                           <span className="text-white font-black text-[11px] mono truncate leading-tight tracking-tighter">{lead.phone || 'S/N'}</span>
@@ -300,7 +348,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
                       </div>
                     </td>
 
-                    <td className="px-5 py-1.5">
+                    <td className="px-5 py-2">
                       <input 
                         type="text" 
                         placeholder="TITULAR..." 
@@ -310,7 +358,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
                       />
                     </td>
 
-                    <td className="px-5 py-1.5">
+                    <td className="px-5 py-2">
                       <input 
                         type="date" 
                         value={lead.followUpDate || ''} 
@@ -319,7 +367,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
                       />
                     </td>
 
-                    <td className="px-5 py-1.5">
+                    <td className="px-5 py-2">
                       <div className="flex gap-2 items-center">
                         <select 
                           value={lead.status} 
@@ -341,7 +389,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
                       </div>
                     </td>
 
-                    <td className="px-3 py-1.5 text-right">
+                    <td className="px-3 py-2 text-right">
                       <button onClick={() => onRemove(lead.id)} className="p-1.5 text-white/5 hover:text-white hover:bg-white/10 rounded-lg border border-transparent hover:border-white/30 transition-all opacity-0 group-hover:opacity-100">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
@@ -353,6 +401,53 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
           </table>
         </div>
       </div>
+
+      {/* Manual Add Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in zoom-in duration-200">
+          <div className="bg-black border-2 border-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_100px_rgba(255,255,255,0.1)]">
+            <div className="p-8 border-b border-white/10 flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">NUEVO REGISTRO</h3>
+                <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em]">Carga Manual de Intel B2B</p>
+              </div>
+              <button onClick={() => setIsAddModalOpen(false)} className="text-white/20 hover:text-white transition-colors">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleManualAddSubmit} className="p-8 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Nombre de Entidad</label>
+                  <input required type="text" value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Categoría / Rubro</label>
+                  <input required type="text" value={newLead.category} onChange={e => setNewLead({...newLead, category: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Teléfono</label>
+                  <input type="text" value={newLead.phone} onChange={e => setNewLead({...newLead, phone: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Email Corporativo</label>
+                  <input type="email" value={newLead.email} onChange={e => setNewLead({...newLead, email: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                </div>
+                <div className="md:col-span-2 space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Ubicación / Dirección</label>
+                  <input type="text" value={newLead.location} onChange={e => setNewLead({...newLead, location: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-white/10 flex justify-end gap-4">
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 h-12 text-[11px] font-black text-white/40 uppercase hover:text-white transition-all tracking-widest">CANCELAR</button>
+                <button type="submit" className="px-10 h-12 bg-white text-black text-[11px] font-black uppercase rounded-xl hover:scale-105 transition-all tracking-[0.2em]">GUARDAR EN ARCHIVO</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       
       <div className="flex justify-between items-center px-4">
          <div className="text-[8px] text-white/20 uppercase tracking-[0.5em] font-black italic">

@@ -31,6 +31,10 @@ const App: React.FC = () => {
     }
   };
 
+  const handleAddManualLead = (lead: Lead) => {
+    setSavedLeads(prev => [lead, ...prev]);
+  };
+
   const handleRemoveFromCRM = (id: string) => {
     if (window.confirm("¿CONFIRMAR ELIMINACIÓN DE REGISTRO?")) {
       setSavedLeads(prev => prev.filter(l => l.id !== id));
@@ -82,7 +86,8 @@ const App: React.FC = () => {
             <CRMView 
               leads={savedLeads} 
               onRemove={handleRemoveFromCRM} 
-              onUpdateLead={handleUpdateLead} 
+              onUpdateLead={handleUpdateLead}
+              onAddManualLead={handleAddManualLead}
             />
           )}
         </div>

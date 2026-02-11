@@ -75,12 +75,8 @@ const App: React.FC = () => {
   const handleUpdateLead = (id: string, updates: Partial<Lead>) => {
     setSavedLeads(prev => prev.map(l => {
         if (l.id === id) {
-            // Check for specific interesting updates to log
             if (updates.status && updates.status !== l.status) {
                 logAction('STATUS_CHANGE', `Cambió estado de ${l.name}: ${l.status.toUpperCase()} -> ${updates.status.toUpperCase()}`);
-            } else if (updates.notes && updates.notes !== l.notes) {
-                 // Debounce logging for notes ideally, but for now simple log
-                 // To avoid spam, we might only log significant changes, but let's log "Actualizó notas"
             }
             return { ...l, ...updates };
         }
@@ -88,10 +84,8 @@ const App: React.FC = () => {
     }));
   };
   
-  // Wrapper for generic update logging from detail panel
   const handleDetailedUpdate = (id: string, updates: Partial<Lead>, context: string) => {
       handleUpdateLead(id, updates);
-      // We log generic updates here if not covered above
       if (!updates.status) {
         const leadName = savedLeads.find(l => l.id === id)?.name || 'Lead';
         logAction('UPDATE', `Editó ${context} en ${leadName}`);
@@ -107,33 +101,42 @@ const App: React.FC = () => {
   // LOGIN SCREEN
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4 font-sans">
-        <div className="max-w-md w-full bg-[#0a0a0a] border border-white/10 rounded-3xl p-8 md:p-12 shadow-2xl text-center space-y-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-50"></div>
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 font-sans relative overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-grid-pattern opacity-40"></div>
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-indigo-900/20 blur-[120px] rounded-full pointer-events-none"></div>
+
+        <div className="max-w-md w-full glass-panel rounded-3xl p-8 md:p-12 shadow-2xl text-center space-y-8 relative z-10 animate-in flex flex-col items-center">
           
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter text-white uppercase">POMPINO</h1>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em]">By Mati Rosas</p>
+          {/* Logo Area */}
+          <div className="relative mb-2">
+            <div className="absolute inset-0 bg-indigo-500/30 blur-xl rounded-full"></div>
+            <img src="logo.png" alt="Pompino Logo" className="w-24 h-24 object-contain relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
           </div>
 
-          <div className="space-y-4">
-             <p className="text-white/60 text-xs font-mono mb-6">IDENTIFICACIÓN REQUERIDA</p>
-             <div className="grid gap-3">
+          <div className="space-y-1">
+            <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase drop-shadow-lg">POMPINO</h1>
+            <p className="text-[11px] font-bold text-indigo-300 uppercase tracking-[0.3em] border-t border-white/10 pt-2 mt-2">By Mati Rosas</p>
+          </div>
+
+          <div className="w-full space-y-4 pt-4">
+             <p className="text-white/50 text-xs font-medium tracking-wide mb-6">SELECCIONA TU PERFIL DE ACCESO</p>
+             <div className="grid gap-3 w-full">
                {(['Mati', 'Diego', 'Gaston'] as User[]).map((user) => (
                  <button
                    key={user}
                    onClick={() => handleLogin(user)}
-                   className="h-14 border border-white/10 rounded-xl hover:bg-white hover:text-black hover:border-white transition-all duration-300 group relative overflow-hidden"
+                   className="h-14 w-full border border-white/10 rounded-xl hover:bg-white hover:text-black hover:border-white transition-all duration-300 group relative overflow-hidden bg-black/40 backdrop-blur-sm"
                  >
                    <span className="relative z-10 text-sm font-black uppercase tracking-widest">{user}</span>
-                   <div className="absolute inset-0 bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                   <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                  </button>
                ))}
              </div>
           </div>
           
-          <div className="pt-8 border-t border-white/5">
-             <p className="text-[8px] text-white/20 uppercase tracking-widest">BZS Grupo Bebidas • Internal Use Only</p>
+          <div className="pt-8 border-t border-white/5 w-full">
+             <p className="text-[9px] text-white/20 uppercase tracking-widest">v8.1 • BZS Intelligence System</p>
           </div>
         </div>
       </div>
@@ -141,11 +144,15 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-black text-white selection:bg-white selection:text-black overflow-x-hidden font-sans">
+    <div className="min-h-screen flex bg-[#050505] text-white selection:bg-indigo-500/30 selection:text-white overflow-x-hidden font-sans relative">
+       {/* Global Background Effects */}
+       <div className="fixed inset-0 bg-grid-pattern opacity-30 pointer-events-none z-0"></div>
+       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-indigo-900/10 blur-[100px] rounded-full pointer-events-none z-0"></div>
+
       {/* Overlay para móvil */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[55] lg:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] lg:hidden transition-opacity duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -166,44 +173,53 @@ const App: React.FC = () => {
         }}
       />
       
-      <main className={`flex-1 flex flex-col min-h-screen relative z-10 transition-all duration-300 lg:ml-64 ${isSidebarOpen ? 'translate-x-64 lg:translate-x-0' : 'translate-x-0'}`}>
-        <header className="px-4 md:px-6 lg:px-10 py-4 lg:py-6 flex justify-between items-center border-b border-white/10 bg-black/90 backdrop-blur-md sticky top-0 z-40 w-full">
+      <main className={`flex-1 flex flex-col min-h-screen relative z-10 transition-all duration-300 lg:ml-72 ${isSidebarOpen ? 'translate-x-72 lg:translate-x-0' : 'translate-x-0'}`}>
+        <header className="px-4 md:px-8 py-4 lg:py-5 flex justify-between items-center border-b border-white/5 bg-[#050505]/80 backdrop-blur-xl sticky top-0 z-40 w-full">
           <div className="flex items-center gap-3 lg:gap-8 flex-1 min-w-0">
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-white hover:bg-white/10 rounded-lg transition-colors shrink-0"
+              className="lg:hidden p-2 -ml-2 text-white/70 hover:text-white hover:bg-white/5 rounded-xl transition-colors shrink-0"
               aria-label="Abrir menú"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <div className="flex flex-col min-w-0">
-              <div className="hidden sm:flex items-center gap-2 mb-1">
-                <span className="text-white/30 text-[8px] font-black uppercase tracking-[0.3em] whitespace-nowrap">v8.0 Protocol</span>
-                <div className="h-px w-4 bg-white/10"></div>
-                <span className="text-white/60 text-[8px] font-black uppercase tracking-[0.2em] truncate">
-                  {activeTab === 'intelligence' ? 'DETECCIÓN B2B' : activeTab === 'crm' ? 'ARCHIVO INTEL' : 'AUDITORÍA'}
-                </span>
-              </div>
-              <h1 className="text-lg md:text-xl lg:text-2xl font-black text-white tracking-tighter uppercase italic leading-none truncate">
-                POMPINO <span className="text-white/30 text-xs md:text-sm normal-case font-bold ml-1">by Mati Rosas</span>
-              </h1>
+            <div className="flex items-center gap-4 min-w-0">
+               {/* Header Logo */}
+               <img src="logo.png" alt="Pompino" className="w-10 h-10 object-contain hidden md:block drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+               
+               <div className="flex flex-col">
+                  <div className="flex items-center gap-3 mb-0.5">
+                    <span className="text-white/40 text-[9px] font-bold uppercase tracking-[0.2em] truncate">
+                      {activeTab === 'intelligence' ? 'Buscador Inteligente' : activeTab === 'crm' ? 'Gestión de Clientes' : 'Auditoría de Sistema'}
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse hidden md:block shadow-[0_0_5px_#6366f1]"></span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                     <h1 className="text-xl md:text-2xl font-black text-white tracking-tight leading-none italic uppercase">
+                        POMPINO
+                     </h1>
+                     <span className="text-indigo-400/80 text-[10px] font-bold uppercase tracking-widest hidden sm:inline-block border-l border-white/10 pl-2">
+                        By Mati Rosas
+                     </span>
+                  </div>
+               </div>
             </div>
           </div>
           
-          <div className="flex-shrink-0 ml-4 pl-4 border-l border-white/20 hidden md:block">
-            <div className="flex items-center gap-2">
+          <div className="flex-shrink-0 ml-4 pl-4 border-l border-white/10 hidden md:block">
+            <div className="flex items-center gap-3 group cursor-default">
                 <div className="text-right">
-                    <p className="text-[9px] font-black text-white uppercase tracking-[0.2em]">{currentUser}</p>
-                    <p className="text-[7px] font-bold text-white/40 uppercase tracking-widest">Online</p>
+                    <p className="text-[10px] font-black text-white uppercase tracking-widest group-hover:text-indigo-400 transition-colors">{currentUser}</p>
+                    <p className="text-[9px] font-medium text-white/30 uppercase tracking-wide">Admin</p>
                 </div>
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center font-black text-xs border border-white/10">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-white/10 to-transparent border border-white/10 flex items-center justify-center font-black text-sm text-white shadow-inner">
                     {currentUser.charAt(0)}
                 </div>
             </div>
           </div>
         </header>
 
-        <div className="p-3 md:p-6 lg:p-8 flex-1 w-full max-w-[1600px] mx-auto overflow-hidden">
+        <div className="p-3 md:p-6 lg:p-8 flex-1 w-full max-w-[1800px] mx-auto overflow-hidden">
           {activeTab === 'intelligence' && (
             <IntelligenceTool 
               leads={scrapedResults}
@@ -228,14 +244,6 @@ const App: React.FC = () => {
             <OperationsView logs={operationsLog} />
           )}
         </div>
-
-        <footer className="px-6 lg:px-10 py-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center bg-black gap-4 text-center">
-          <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.4em]">© 2025 • POMPINO by Mati Rosas • BZS GRUPO BEBIDAS</p>
-          <div className="hidden sm:flex gap-6 text-[8px] font-black text-white/10 uppercase tracking-[0.2em]">
-            <span>Tailored Experience</span>
-            <span>v8.0 Optimized</span>
-          </div>
-        </footer>
       </main>
     </div>
   );

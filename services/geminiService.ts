@@ -23,61 +23,61 @@ const getUserCoordinates = (): Promise<{ latitude: number; longitude: number } |
   });
 };
 
-export const scrapeLeads = async (zone: string, type: string, isDeepSearch: boolean = false): Promise<Lead[]> => {
+export const scrapeLeads = async (zone: string, type: string, isDeepSearch: boolean = true): Promise<Lead[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const userCoords = await getUserCoordinates();
 
   try {
-    // Fase 1: Grounding de Alta Precisión
-    const groundingResponse = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Actua como un experto en B2B Lead Generation. 
-      Encuentra negocios de tipo "${type}" en "${zone}". 
-      MISION: 
-      1. Extrae URL oficial.
-      2. Extrae perfil de INSTAGRAM (vital).
-      3. Extrae telefonos (identifica WhatsApp).
-      4. Extrae emails corporativos.
-      Usa Google Maps para ubicaciones y Search para redes sociales.`,
+    // FASE 1: DESCUBRIMIENTO AGRESIVO (Usamos Pro para mejor razonamiento y síntesis)
+    // El modelo Pro es mucho mejor navegando múltiples herramientas y consolidando listas largas.
+    const discoveryResponse = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: `Eres un experto en inteligencia de mercado y Lead Generation B2B. 
+      OBJETIVO: Encontrar la MAYOR cantidad posible de negocios del rubro "${type}" en la zona de "${zone}" y alrededores inmediatos.
+      
+      FUENTES OBLIGATORIAS DE BÚSQUEDA:
+      1. Google Maps (negocios locales verificados).
+      2. Directorios Profesionales (TripAdvisor, Yelp, Páginas Amarillas locales).
+      3. Redes Sociales (Instagram, Facebook Business, LinkedIn).
+      4. Listas de Cámaras de Comercio y Guías de Ocio locales.
+      
+      MISION CRÍTICA:
+      - No te detengas en los primeros 5 resultados. Busca listados extensos.
+      - Para cada negocio, necesito: Nombre exacto, Dirección, Teléfono (especifica si es WhatsApp), Email corporativo y Perfil de Instagram/Redes.
+      - Si encuentras pocos resultados, expande el radio de búsqueda a barrios o localidades vecinas para completar una base de datos robusta.
+      - PRIORIZA: Negocios activos con presencia digital.`,
       config: {
         tools: [
-          { googleMaps: {} },
-          { googleSearch: {} }
-        ],
-        ...(userCoords && {
-          toolConfig: {
-            retrievalConfig: {
-              latLng: {
-                latitude: userCoords.latitude,
-                longitude: userCoords.longitude
-              }
-            }
-          }
-        })
+          { googleSearch: {} } // Gemini 3 Pro usa googleSearch de forma excelente para browsing
+        ]
       }
     });
 
-    const rawInformation = groundingResponse.text || "No se encontró información básica.";
-    const groundingChunks = groundingResponse.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const groundingUrls = groundingChunks.map(c => c.maps?.uri || c.web?.uri).filter(Boolean) as string[];
-
-    // Fase 2: Estructuración Inteligente
-    // Cambiamos a gemini-3-flash-preview para mayor rapidez y estabilidad en la generación de JSON
+    const rawInformation = discoveryResponse.text || "No se encontró información básica.";
+    
+    // FASE 2: ESTRUCTURACIÓN MASIVA
+    // Usamos Flash para procesar el volumen de texto generado por Pro y convertirlo en JSON limpio
     const structuringResponse = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Convierte esta información en un array JSON estructurado para CRM:
+      contents: `Analiza la siguiente información de prospección y genera un listado JSON exhaustivo. 
+      No omitas ningún negocio mencionado.
       
+      INFORMACIÓN RECOLECTADA:
       "${rawInformation}"
       
-      Esquema requerido:
+      REGLAS DE FORMATO:
+      - Genera un array de objetos.
+      - Si falta el email, deja el campo vacío.
+      - Si el teléfono parece celular, asume que es WhatsApp.
+      - Limpia los nombres de caracteres extraños.
+      
+      ESQUEMA JSON:
       - name: Nombre comercial
-      - phone: Formato internacional
-      - whatsapp: Solo dígitos
-      - instagram: URL completa
-      - website: URL completa
-      - email: Email detectado
-      - category: Rubro
-      - location: Dirección completa`,
+      - phone: Teléfono (con código de área)
+      - whatsapp: Solo números
+      - email: Email de contacto
+      - category: Sub-rubro específico
+      - location: Dirección completa en ${zone}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -88,42 +88,36 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
               name: { type: Type.STRING },
               phone: { type: Type.STRING },
               whatsapp: { type: Type.STRING },
-              instagram: { type: Type.STRING },
-              website: { type: Type.STRING },
               email: { type: Type.STRING },
               category: { type: Type.STRING },
               location: { type: Type.STRING },
             },
-            required: ["name"]
+            required: ["name", "location"]
           }
         }
       }
     });
 
     const responseText = structuringResponse.text;
-    if (!responseText) throw new Error("La IA no devolvió datos estructurados.");
+    if (!responseText) throw new Error("La IA no pudo procesar el volumen de datos.");
 
     const rawData = JSON.parse(responseText);
 
+    // Mapeo final y enriquecimiento
     return rawData.map((item: any, index: number) => ({
       ...item,
       id: `lead-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
       status: 'discovered',
       isClient: false,
-      contactName: '',
       notes: '',
-      website: (item.website && item.website !== "N/A") ? (item.website.startsWith('http') ? item.website : `https://${item.website}`) : "",
-      instagram: (item.instagram && item.instagram !== "N/A") ? (item.instagram.startsWith('http') ? item.instagram : `https://${item.instagram}`) : "",
       whatsapp: item.whatsapp || (item.phone ? item.phone.replace(/\D/g, '') : ""),
-      sourceUrl: groundingUrls[index % groundingUrls.length] || '',
       savedAt: Date.now()
     }));
   } catch (e: any) {
     console.error("Critical Scraping Error:", e);
-    // Error más descriptivo para el usuario
-    if (e.message?.includes("500") || e.message?.includes("Internal Server Error")) {
-      throw new Error("Error del servidor de IA. Intenta con una zona más específica.");
+    if (e.message?.includes("quota") || e.message?.includes("exhausted")) {
+      throw new Error("Límite de búsqueda alcanzado por hoy. Prueba en unos minutos.");
     }
-    throw new Error(e.message || "Error desconocido en el motor de búsqueda.");
+    throw new Error("Error en la red de inteligencia. Reintenta con términos más generales.");
   }
 };

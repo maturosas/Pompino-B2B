@@ -6,9 +6,7 @@ export interface Lead {
   category: string;
   phone: string;
   email: string;
-  website?: string;
-  instagram?: string;
-  whatsapp?: string; // Nuevo: Para links directos
+  whatsapp?: string;
   status: 'discovered' | 'qualified' | 'contacted' | 'closed';
   sourceUrl?: string;
   savedAt?: number;
@@ -16,6 +14,12 @@ export interface Lead {
   isClient?: boolean;   
   notes?: string;
   followUpDate?: string;
+  // Campos para la Ficha Técnica (Ficha del Cliente)
+  decisionMaker?: string;
+  lastContactDate?: string;
+  businessPotential?: 'low' | 'medium' | 'high';
+  deliveryZone?: string;
+  paymentTerms?: string;
 }
 
 export interface PipelineState {

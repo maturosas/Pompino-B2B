@@ -8,6 +8,8 @@ interface SidebarProps {
   setActiveTab: (tab: 'intelligence' | 'crm' | 'operations') => void;
   activeFolder: string;
   setActiveFolder: (folder: string) => void;
+  viewScope: User | 'me';
+  setViewScope: (scope: User | 'me') => void;
   savedLeads: Lead[];
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
@@ -20,6 +22,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab, 
   activeFolder,
   setActiveFolder,
+  viewScope,
+  setViewScope,
   savedLeads, 
   isOpen, 
   setIsOpen,
@@ -27,13 +31,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout
 }) => {
   
+  // Filter leads based on view scope
+  const scopedLeads = savedLeads.filter(l => {
+      if (viewScope === 'me') return l.owner === currentUser;
+      return l.owner === viewScope;
+  });
+
   const folders = [
-    { id: 'all', label: 'Todos', icon: '📂', count: savedLeads.length },
-    { id: 'frio', label: 'Prospectos Fríos', icon: '❄️', count: savedLeads.filter(l => l.status === 'frio').length },
-    { id: 'contacted', label: 'Contactados', icon: '📨', count: savedLeads.filter(l => l.status === 'contacted').length },
-    { id: 'negotiation', label: 'En Negociación', icon: '🤝', count: savedLeads.filter(l => l.status === 'negotiation').length },
-    { id: 'client', label: 'Clientes Activos', icon: '⭐', count: savedLeads.filter(l => l.status === 'client').length },
+    { id: 'all', label: 'Todos', icon: '📂', count: scopedLeads.length },
+    { id: 'frio', label: 'Prospectos Fríos', icon: '❄️', count: scopedLeads.filter(l => l.status === 'frio').length },
+    { id: 'contacted', label: 'Contactados', icon: '📨', count: scopedLeads.filter(l => l.status === 'contacted').length },
+    { id: 'negotiation', label: 'En Negociación', icon: '🤝', count: scopedLeads.filter(l => l.status === 'negotiation').length },
+    { id: 'client', label: 'Clientes Activos', icon: '⭐', count: scopedLeads.filter(l => l.status === 'client').length },
   ];
+
+  const teamMembers: User[] = ['Mati', 'Diego', 'Gaston', 'TESTER'];
 
   return (
     <aside className={`
@@ -100,32 +112,65 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
                 activeTab === 'crm' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/30'
             }`}>
-                {savedLeads.length}
+                {scopedLeads.length}
             </span>
           </button>
 
           {/* Sub-Folders CRM */}
           {activeTab === 'crm' && (
-            <div className="ml-4 pl-4 border-l border-white/5 space-y-0.5 mt-2 mb-4 animate-in">
-              {folders.map(folder => (
-                <button
-                  key={folder.id}
-                  onClick={() => { setActiveFolder(folder.id); if(window.innerWidth < 1024) setIsOpen(false); }}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-all flex items-center justify-between text-[11px] ${
-                    activeFolder === folder.id
-                      ? 'bg-white/10 text-white font-bold'
-                      : 'text-white/40 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                     <span className="opacity-70">{folder.icon}</span>
-                     {folder.label}
-                  </span>
-                  {folder.count > 0 && (
-                      <span className="text-[9px] opacity-50">{folder.count}</span>
-                  )}
-                </button>
-              ))}
+            <div className="ml-4 pl-4 border-l border-white/5 space-y-4 mt-2 mb-4 animate-in">
+              
+              {/* User Selector (Team Folders) */}
+              <div className="pr-2">
+                  <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-2 px-1">Equipo Comercial</p>
+                  <div className="flex flex-col gap-1">
+                      <button 
+                        onClick={() => setViewScope('me')}
+                        className={`text-left px-3 py-2 rounded-lg text-[10px] uppercase font-bold transition-all flex items-center gap-2 ${
+                            viewScope === 'me' ? 'bg-indigo-500/20 text-indigo-300' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                          <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
+                          Mi Pipeline
+                      </button>
+                      {teamMembers.filter(m => m !== currentUser).map(member => (
+                          <button 
+                            key={member}
+                            onClick={() => setViewScope(member)}
+                            className={`text-left px-3 py-2 rounded-lg text-[10px] uppercase font-bold transition-all flex items-center gap-2 ${
+                                viewScope === member ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                              <span className="w-2 h-2 rounded-full bg-white/20"></span>
+                              {member}
+                          </button>
+                      ))}
+                  </div>
+              </div>
+
+              {/* Status Filters */}
+              <div className="space-y-0.5">
+                  <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-2 px-1">Estados</p>
+                  {folders.map(folder => (
+                    <button
+                      key={folder.id}
+                      onClick={() => { setActiveFolder(folder.id); if(window.innerWidth < 1024) setIsOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all flex items-center justify-between text-[11px] ${
+                        activeFolder === folder.id
+                          ? 'bg-white/10 text-white font-bold'
+                          : 'text-white/40 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="opacity-70">{folder.icon}</span>
+                        {folder.label}
+                      </span>
+                      {folder.count > 0 && (
+                          <span className="text-[9px] opacity-50">{folder.count}</span>
+                      )}
+                    </button>
+                  ))}
+              </div>
             </div>
           )}
         </div>

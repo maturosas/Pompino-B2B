@@ -34,18 +34,19 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
           {/* Section: Información Comercial */}
           <section className="space-y-6">
             <h3 className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] border-b border-white/5 pb-2 italic">Perfil de Contacto</h3>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Persona de Contacto</label>
+                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">POC (Persona de Contacto)</label>
                 <input 
                   value={lead.contactName || ''} 
-                  onChange={(e) => onUpdate({ contactName: e.target.value }, 'Contacto')}
+                  onChange={(e) => onUpdate({ contactName: e.target.value }, 'POC')}
                   placeholder="Ej: Juan Perez..."
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none transition-all uppercase"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Estado del Prospecto</label>
+                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Status</label>
                 <select 
                   value={lead.status} 
                   onChange={(e) => onUpdate({ status: e.target.value as any }, 'Status')}
@@ -59,28 +60,36 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Responsable Interno</label>
-                <input 
-                  value={lead.decisionMaker || ''} 
-                  onChange={(e) => onUpdate({ decisionMaker: e.target.value }, 'Responsable')}
-                  placeholder="Vendedor asignado..."
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Potencial de Venta</label>
-                <select 
-                  value={lead.businessPotential || 'medium'} 
-                  onChange={(e) => onUpdate({ businessPotential: e.target.value as any }, 'Potencial')}
-                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
-                >
-                  <option value="low">BAJO</option>
-                  <option value="medium">MEDIO</option>
-                  <option value="high">ALTO</option>
-                </select>
-              </div>
+            {/* Nueva Sección: Próxima Acción */}
+            <div className="p-4 rounded-xl bg-indigo-500/5 border border-indigo-500/20 space-y-4">
+                 <h4 className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Planificación Comercial</h4>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-white/40 uppercase">Próxima Acción</label>
+                        <select 
+                            value={lead.nextAction || 'call'} 
+                            onChange={(e) => onUpdate({ nextAction: e.target.value as any }, 'Próxima Acción')}
+                            className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none uppercase"
+                        >
+                            <option value="call">Llamado</option>
+                            <option value="whatsapp">Whatsapp</option>
+                            <option value="email">Email</option>
+                            <option value="visit">Visita</option>
+                            <option value="quote">Presupuesto</option>
+                            <option value="offer">Oferta</option>
+                            <option value="sale">Venta</option>
+                        </select>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-white/40 uppercase">Fecha Agenda</label>
+                         <input 
+                            type="date"
+                            value={lead.nextActionDate || ''} 
+                            onChange={(e) => onUpdate({ nextActionDate: e.target.value }, 'Fecha Agenda')}
+                            className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none uppercase"
+                        />
+                    </div>
+                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -124,25 +133,31 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
             </div>
           </section>
 
-          {/* Section: Logística y Pagos */}
+          {/* Section: Operaciones */}
           <section className="space-y-6">
             <h3 className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] border-b border-white/5 pb-2 italic">Operaciones</h3>
+            
             <div className="space-y-2">
-              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Condiciones de Pago</label>
-              <input 
-                value={lead.paymentTerms || ''} 
-                onChange={(e) => onUpdate({ paymentTerms: e.target.value }, 'Pago')}
-                placeholder="Ej: Contado / 30 días / Consignación..."
-                className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
-              />
+                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Lista de Precios Ofrecida</label>
+                <select 
+                    value={lead.priceList || 'regular'} 
+                    onChange={(e) => onUpdate({ priceList: e.target.value as any }, 'Lista Precios')}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none uppercase"
+                >
+                    <option value="regular">Regular</option>
+                    <option value="special">Especial</option>
+                    <option value="wholesale">Mayorista</option>
+                    <option value="discount_15">15% OFF</option>
+                </select>
             </div>
+
             <div className="space-y-2">
-              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notas de Inteligencia de Mercado</label>
+              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Comentarios / Bitácora</label>
               <textarea 
                 rows={5}
                 value={lead.notes || ''} 
-                onChange={(e) => onUpdate({ notes: e.target.value }, 'Notas')}
-                placeholder="Escribe aquí detalles de la negociación, competencia que manejan, productos preferidos..."
+                onChange={(e) => onUpdate({ notes: e.target.value }, 'Comentarios')}
+                placeholder="Escribe aquí detalles de la negociación..."
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none resize-none italic"
               />
             </div>
@@ -151,13 +166,10 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
           {/* Section: Historial */}
           <section className="p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Último Contacto</span>
-              <input 
-                type="date"
-                value={lead.lastContactDate || ''} 
-                onChange={(e) => onUpdate({ lastContactDate: e.target.value }, 'Fecha Contacto')}
-                className="bg-transparent border-none text-[10px] text-white font-black uppercase outline-none"
-              />
+              <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Último Contacto (Auto)</span>
+              <span className="text-[10px] text-white font-black uppercase">
+                  {lead.lastContactDate ? new Date(lead.lastContactDate).toLocaleString() : 'Sin actividad'}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Fecha de Captura</span>

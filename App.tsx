@@ -5,8 +5,9 @@ import IntelligenceTool from './components/IntelligenceTool';
 import CRMView from './components/CRMView';
 import OperationsView from './components/OperationsView';
 import { PompinoLogo } from './components/PompinoLogo';
-import { Lead, User, OperationLog } from './types';
+import { Lead, User, OperationLog, TransferRequest } from './types';
 import HowToUseModal from './components/HowToUseModal';
+import TaskReminderModal from './components/TaskReminderModal';
 
 const App: React.FC = () => {
   // Identity State
@@ -15,31 +16,43 @@ const App: React.FC = () => {
   // App State
   const [activeTab, setActiveTab] = useState<'intelligence' | 'crm' | 'operations'>('intelligence');
   const [activeFolder, setActiveFolder] = useState<string>('all');
+  
+  // View Scope: 'me' means my leads, or specific User name means viewing their folder
+  const [viewScope, setViewScope] = useState<User | 'me'>('me'); 
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showLoginHelp, setShowLoginHelp] = useState(false);
+  
+  // Task Reminder State
+  const [dailyTasks, setDailyTasks] = useState<Lead[]>([]);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   // Data State
   const [savedLeads, setSavedLeads] = useState<Lead[]>([]);
   const [scrapedResults, setScrapedResults] = useState<Lead[]>([]);
   const [operationsLog, setOperationsLog] = useState<OperationLog[]>([]);
+  const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([]);
 
   // Init Data from LocalStorage
   useEffect(() => {
-    const storedCRM = localStorage.getItem('pompino_b2b_crm_v7');
+    const storedCRM = localStorage.getItem('pompino_b2b_crm_v8'); // Increased version for schema change
     const storedSearch = localStorage.getItem('pompino_b2b_search_v7');
     const storedLogs = localStorage.getItem('pompino_b2b_logs_v1');
+    const storedRequests = localStorage.getItem('pompino_b2b_requests_v1');
     const storedUser = sessionStorage.getItem('pompino_user_session');
 
     if (storedCRM) setSavedLeads(JSON.parse(storedCRM));
     if (storedSearch) setScrapedResults(JSON.parse(storedSearch));
     if (storedLogs) setOperationsLog(JSON.parse(storedLogs));
+    if (storedRequests) setTransferRequests(JSON.parse(storedRequests));
     if (storedUser) setCurrentUser(storedUser as User);
   }, []);
 
   // Persistence
-  useEffect(() => { localStorage.setItem('pompino_b2b_crm_v7', JSON.stringify(savedLeads)); }, [savedLeads]);
+  useEffect(() => { localStorage.setItem('pompino_b2b_crm_v8', JSON.stringify(savedLeads)); }, [savedLeads]);
   useEffect(() => { localStorage.setItem('pompino_b2b_search_v7', JSON.stringify(scrapedResults)); }, [scrapedResults]);
   useEffect(() => { localStorage.setItem('pompino_b2b_logs_v1', JSON.stringify(operationsLog)); }, [operationsLog]);
+  useEffect(() => { localStorage.setItem('pompino_b2b_requests_v1', JSON.stringify(transferRequests)); }, [transferRequests]);
 
   // Logging System
   const logAction = (action: OperationLog['action'], details: string) => {
@@ -56,19 +69,48 @@ const App: React.FC = () => {
 
   // Actions
   const handleSaveToCRM = (lead: Lead) => {
-    if (!savedLeads.find(l => l.id === lead.id)) {
-      setSavedLeads(prev => [{ ...lead, savedAt: Date.now(), isClient: false, status: 'frio' }, ...prev]);
-      logAction('CREATE', `Archivó prospecto: ${lead.name}`);
+    if (!currentUser) return;
+
+    // Check collision globally
+    const existingLead = savedLeads.find(l => l.id === lead.id || l.name === lead.name); // Simple collision check by ID or Name
+    
+    if (existingLead) {
+        const ownerName = existingLead.owner || 'Desconocido';
+        alert(`⛔ ACCESO DENEGADO\n\nEl lead "${existingLead.name}" ya está siendo gestionado por: ${ownerName}.\n\nPuedes solicitar una transferencia desde el CRM.`);
+        return;
     }
+
+    // Save with Owner
+    const leadWithOwner: Lead = { 
+        ...lead, 
+        savedAt: Date.now(), 
+        isClient: false, 
+        status: 'frio', 
+        owner: currentUser,
+        // Init default values
+        lastContactDate: undefined,
+        priceList: 'regular',
+        nextAction: 'call'
+    };
+
+    setSavedLeads(prev => [leadWithOwner, ...prev]);
+    logAction('CREATE', `Archivó prospecto: ${lead.name}`);
   };
 
   const handleAddManualLead = (lead: Lead) => {
-    setSavedLeads(prev => [lead, ...prev]);
+    if (!currentUser) return;
+    setSavedLeads(prev => [{...lead, owner: currentUser, savedAt: Date.now(), priceList: 'regular'}, ...prev]);
     logAction('CREATE', `Creó manualmente: ${lead.name}`);
   };
 
   const handleRemoveFromCRM = (id: string) => {
     const lead = savedLeads.find(l => l.id === id);
+    // Security check: only owner can delete
+    if (lead?.owner && lead.owner !== currentUser) {
+        alert("No tienes permiso para eliminar leads de otros usuarios.");
+        return;
+    }
+
     if (window.confirm("¿CONFIRMAR ELIMINACIÓN DE REGISTRO?")) {
       setSavedLeads(prev => prev.filter(l => l.id !== id));
       logAction('DELETE', `Eliminó registro: ${lead?.name || 'Desconocido'}`);
@@ -78,10 +120,18 @@ const App: React.FC = () => {
   const handleUpdateLead = (id: string, updates: Partial<Lead>) => {
     setSavedLeads(prev => prev.map(l => {
         if (l.id === id) {
-            if (updates.status && updates.status !== l.status) {
+             const now = new Date().toISOString().split('T')[0];
+             let autoUpdates: Partial<Lead> = {};
+             
+             // Auto-generate Last Contact Date if important fields change
+             if (updates.status || updates.notes || updates.nextAction || updates.priceList) {
+                 autoUpdates.lastContactDate = now;
+             }
+
+             if (updates.status && updates.status !== l.status) {
                 logAction('STATUS_CHANGE', `Cambió estado de ${l.name}: ${l.status.toUpperCase()} -> ${updates.status.toUpperCase()}`);
             }
-            return { ...l, ...updates };
+            return { ...l, ...updates, ...autoUpdates };
         }
         return l;
     }));
@@ -95,10 +145,68 @@ const App: React.FC = () => {
       }
   };
 
+  // --- Transfer System ---
+
+  const handleRequestTransfer = (lead: Lead) => {
+      if (!currentUser || !lead.owner) return;
+      
+      const exists = transferRequests.find(r => r.leadId === lead.id && r.fromUser === currentUser && r.status === 'pending');
+      if (exists) {
+          alert("Ya hay una solicitud pendiente para este lead.");
+          return;
+      }
+
+      const request: TransferRequest = {
+          id: `req-${Date.now()}`,
+          leadId: lead.id,
+          leadName: lead.name,
+          fromUser: currentUser,
+          toUser: lead.owner,
+          status: 'pending',
+          timestamp: Date.now()
+      };
+
+      setTransferRequests(prev => [request, ...prev]);
+      logAction('TRANSFER_REQUEST', `Solicitó traspaso de: ${lead.name} a ${lead.owner}`);
+      alert(`Solicitud enviada a ${lead.owner}`);
+  };
+
+  const handleResolveTransfer = (requestId: string, accepted: boolean) => {
+      const request = transferRequests.find(r => r.id === requestId);
+      if (!request) return;
+
+      if (accepted) {
+          handleUpdateLead(request.leadId, { owner: request.fromUser, status: 'frio' }); 
+           setSavedLeads(prev => prev.map(l => {
+                if (l.id === request.leadId) {
+                    return { ...l, owner: request.fromUser };
+                }
+                return l;
+            }));
+          logAction('TRANSFER_ACCEPT', `Aceptó traspaso de ${request.leadName} a ${request.fromUser}`);
+      }
+      setTransferRequests(prev => prev.map(r => r.id === requestId ? { ...r, status: accepted ? 'accepted' : 'rejected' } : r));
+  };
+
+  // --- Auth & Daily Tasks ---
+
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    setViewScope('me'); 
     sessionStorage.setItem('pompino_user_session', user);
     logAction('UPDATE', `Inicio de sesión en el sistema`);
+    
+    // Check for today's tasks
+    const today = new Date().toISOString().split('T')[0];
+    const tasks = savedLeads.filter(l => 
+        l.owner === user && 
+        l.nextActionDate === today
+    );
+    
+    if (tasks.length > 0) {
+        setDailyTasks(tasks);
+        setShowTaskModal(true);
+    }
   };
 
   // LOGIN SCREEN
@@ -125,7 +233,7 @@ const App: React.FC = () => {
           <div className="w-full space-y-4 pt-4">
              <p className="text-white/50 text-xs font-medium tracking-wide mb-6">SELECCIONA TU PERFIL DE ACCESO</p>
              <div className="grid gap-3 w-full">
-               {(['Mati', 'Diego', 'Gaston'] as User[]).map((user) => (
+               {(['Mati', 'Diego', 'Gaston', 'TESTER'] as User[]).map((user) => (
                  <button
                    key={user}
                    onClick={() => handleLogin(user)}
@@ -145,7 +253,7 @@ const App: React.FC = () => {
              >
                 ¿Cómo usar la plataforma?
              </button>
-             <p className="text-[9px] text-white/20 uppercase tracking-widest">v8.2 • BZS Intelligence System</p>
+             <p className="text-[9px] text-white/20 uppercase tracking-widest">v8.3 • BZS Intelligence System</p>
           </div>
         </div>
         
@@ -168,11 +276,21 @@ const App: React.FC = () => {
         />
       )}
 
+      {/* Modals */}
+      <TaskReminderModal 
+        isOpen={showTaskModal} 
+        onClose={() => setShowTaskModal(false)} 
+        tasks={dailyTasks} 
+        user={currentUser} 
+      />
+
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={(tab) => { setActiveTab(tab); setIsSidebarOpen(false); }} 
         activeFolder={activeFolder}
         setActiveFolder={setActiveFolder}
+        viewScope={viewScope}
+        setViewScope={setViewScope}
         savedLeads={savedLeads}
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
@@ -248,7 +366,7 @@ const App: React.FC = () => {
               leads={scrapedResults}
               onUpdateLeads={setScrapedResults}
               onSaveToCRM={handleSaveToCRM} 
-              savedIds={new Set(savedLeads.map(l => l.id))}
+              allSavedLeads={savedLeads}
               logAction={logAction}
               currentUser={currentUser}
             />
@@ -261,6 +379,11 @@ const App: React.FC = () => {
               onDetailedUpdate={handleDetailedUpdate}
               onAddManualLead={handleAddManualLead}
               activeFolder={activeFolder}
+              currentUser={currentUser}
+              viewScope={viewScope}
+              transferRequests={transferRequests}
+              onResolveTransfer={handleResolveTransfer}
+              onRequestTransfer={handleRequestTransfer}
             />
           )}
           {activeTab === 'operations' && (

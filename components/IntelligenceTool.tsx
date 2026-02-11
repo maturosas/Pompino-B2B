@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { scrapeLeads } from '../services/geminiService';
 import { Lead, OperationLog, User } from '../types';
+import HowToUseModal from './HowToUseModal';
 
 interface IntelligenceToolProps {
   leads: Lead[];
@@ -17,6 +18,7 @@ const IntelligenceTool: React.FC<IntelligenceToolProps> = ({ leads, onUpdateLead
   const [type, setType] = useState('');
   const [log, setLog] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   
   // Historial de búsquedas (Listas separadas para sugerencias granulares)
   const [historyZones, setHistoryZones] = useState<string[]>([]);
@@ -100,17 +102,26 @@ const IntelligenceTool: React.FC<IntelligenceToolProps> = ({ leads, onUpdateLead
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in">
-      
+      <HowToUseModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+
       {/* Search Command Center */}
       <div className="p-1 rounded-3xl bg-gradient-to-b from-white/10 to-transparent shadow-2xl">
           <div className="glass-solid rounded-[22px] p-6 md:p-8 relative overflow-hidden">
             {/* Ambient Background Light */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full pointer-events-none"></div>
-
-            <h2 className="text-lg font-black text-white/90 uppercase italic tracking-tighter mb-6 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_#6366f1]"></span>
-                Configuración de Rastreo
-            </h2>
+            
+            <div className="flex justify-between items-center mb-6 relative z-10">
+                <h2 className="text-lg font-black text-white/90 uppercase italic tracking-tighter flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_#6366f1]"></span>
+                    Configuración de Rastreo
+                </h2>
+                <button 
+                  onClick={() => setShowHelp(true)} 
+                  className="px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-[10px] font-bold text-indigo-300 uppercase tracking-wide transition-all hover:text-white"
+                >
+                  💡 Cómo usar
+                </button>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10">
                 {/* Zone Input */}

@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Lead } from '../types';
 import LeadDetailPanel from './LeadDetailPanel';
+import HowToUseModal from './HowToUseModal';
 
 interface CRMViewProps {
   leads: Lead[];
@@ -21,6 +22,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('savedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showHelp, setShowHelp] = useState(false);
   
   // Advanced Filter State
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -180,15 +182,25 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
+      <HowToUseModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+
       {/* Header with Active Folder Title */}
       <div className="flex flex-col md:flex-row md:items-end justify-between pb-2 gap-4">
         <div>
             <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter text-white drop-shadow-md">
                 {getFolderName(activeFolder)}
             </h2>
-            <p className="text-white/40 text-xs font-medium mt-1">
-                Visualizando <span className="text-white">{processedLeads.length}</span> oportunidades comerciales
-            </p>
+            <div className="flex items-center gap-3 mt-1">
+                <p className="text-white/40 text-xs font-medium">
+                    Visualizando <span className="text-white">{processedLeads.length}</span> oportunidades comerciales
+                </p>
+                <button 
+                  onClick={() => setShowHelp(true)}
+                  className="text-[10px] font-bold text-white/30 hover:text-white underline decoration-white/10 hover:decoration-white transition-all uppercase tracking-wide"
+                >
+                    ¿Cómo funciona esto?
+                </button>
+            </div>
         </div>
         <div className="flex gap-2">
             <button onClick={() => setIsAddModalOpen(true)} className="h-10 px-5 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 hover:-translate-y-0.5">

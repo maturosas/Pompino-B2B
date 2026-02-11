@@ -6,6 +6,7 @@ import CRMView from './components/CRMView';
 import OperationsView from './components/OperationsView';
 import { PompinoLogo } from './components/PompinoLogo';
 import { Lead, User, OperationLog } from './types';
+import HowToUseModal from './components/HowToUseModal';
 
 const App: React.FC = () => {
   // Identity State
@@ -15,6 +16,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'intelligence' | 'crm' | 'operations'>('intelligence');
   const [activeFolder, setActiveFolder] = useState<string>('all');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLoginHelp, setShowLoginHelp] = useState(false);
 
   // Data State
   const [savedLeads, setSavedLeads] = useState<Lead[]>([]);
@@ -136,10 +138,18 @@ const App: React.FC = () => {
              </div>
           </div>
           
-          <div className="pt-8 border-t border-white/5 w-full">
+          <div className="pt-8 border-t border-white/5 w-full flex flex-col items-center gap-4">
+             <button 
+                onClick={() => setShowLoginHelp(true)}
+                className="text-[10px] font-bold text-white/40 hover:text-white uppercase tracking-widest border-b border-transparent hover:border-white/50 transition-all pb-0.5"
+             >
+                ¿Cómo usar la plataforma?
+             </button>
              <p className="text-[9px] text-white/20 uppercase tracking-widest">v8.2 • BZS Intelligence System</p>
           </div>
         </div>
+        
+        <HowToUseModal isOpen={showLoginHelp} onClose={() => setShowLoginHelp(false)} />
       </div>
     );
   }

@@ -50,26 +50,26 @@ const App: React.FC = () => {
       />
       
       <main className="ml-64 flex-1 flex flex-col min-h-screen relative z-10">
-        <header className="px-12 py-10 flex justify-between items-end border-b border-white/10 bg-black sticky top-0 z-40">
+        <header className="px-8 py-4 flex justify-between items-end border-b border-white/10 bg-black sticky top-0 z-40">
           <div>
-            <div className="flex items-center gap-4 mb-2">
-              <span className="text-white/20 text-[10px] font-black uppercase tracking-[0.6em]">Protocolo B2B v7.0</span>
-              <div className="h-px w-12 bg-white/10"></div>
-              <span className="text-white text-[10px] font-black uppercase tracking-[0.4em]">
+            <div className="flex items-center gap-4 mb-1">
+              <span className="text-white/20 text-[8px] font-black uppercase tracking-[0.5em]">Protocolo B2B v7.5</span>
+              <div className="h-px w-8 bg-white/10"></div>
+              <span className="text-white text-[8px] font-black uppercase tracking-[0.3em]">
                 {activeTab === 'intelligence' ? 'Detección Global' : 'Gestión de Activos'}
               </span>
             </div>
-            <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic leading-none">
+            <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic leading-none">
               POMPINO <span className="text-white/20">B2B</span>
             </h1>
           </div>
           
           <div className="text-right pb-1">
-            <p className="text-[12px] font-black text-white uppercase tracking-widest italic">BZS GRUPO BEBIDAS</p>
+            <p className="text-[10px] font-black text-white uppercase tracking-widest italic">BZS GRUPO BEBIDAS</p>
           </div>
         </header>
 
-        <div className="px-12 py-12 flex-1 w-full max-w-7xl mx-auto">
+        <div className="px-8 py-6 flex-1 w-full max-w-[1600px] mx-auto">
           {activeTab === 'intelligence' && (
             <IntelligenceTool 
               leads={scrapedResults}
@@ -87,11 +87,11 @@ const App: React.FC = () => {
           )}
         </div>
 
-        <footer className="px-12 py-10 border-t border-white/10 flex justify-between items-center bg-black">
-          <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.5em]">© 2024 • POWERED BY BZS GRUPO BEBIDAS</p>
-          <div className="flex gap-12 text-[9px] font-black text-white/10 uppercase tracking-widest">
-            <span>Interface High-Contrast</span>
-            <span>Grounding Optimized</span>
+        <footer className="px-8 py-4 border-t border-white/10 flex justify-between items-center bg-black">
+          <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.4em]">© 2025 • BZS GRUPO BEBIDAS</p>
+          <div className="flex gap-8 text-[8px] font-black text-white/5 uppercase tracking-widest">
+            <span>Ultra Density Display</span>
+            <span>Intel Core v7.5</span>
           </div>
         </footer>
       </main>

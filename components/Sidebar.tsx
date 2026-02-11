@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Lead, User } from '../types';
+import { PompinoLogo } from './PompinoLogo';
 
 interface SidebarProps {
   activeTab: 'intelligence' | 'crm' | 'operations';
@@ -43,7 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center gap-3">
           {/* Sidebar Logo */}
           <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0 border border-white/5 shadow-lg shadow-black/50">
-             <img src="logo.png" alt="Pompino" className="w-7 h-7 object-contain" />
+             <PompinoLogo className="w-6 h-6 text-white" />
           </div>
           
           <div className="min-w-0">

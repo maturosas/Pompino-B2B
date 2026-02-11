@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import IntelligenceTool from './components/IntelligenceTool';
 import CRMView from './components/CRMView';
 import OperationsView from './components/OperationsView';
+import { PompinoLogo } from './components/PompinoLogo';
 import { Lead, User, OperationLog } from './types';
 
 const App: React.FC = () => {
@@ -109,14 +110,14 @@ const App: React.FC = () => {
         <div className="max-w-md w-full glass-panel rounded-3xl p-8 md:p-12 shadow-2xl text-center space-y-8 relative z-10 animate-in flex flex-col items-center">
           
           {/* Logo Area */}
-          <div className="relative mb-2">
-            <div className="absolute inset-0 bg-indigo-500/30 blur-xl rounded-full"></div>
-            <img src="logo.png" alt="Pompino Logo" className="w-24 h-24 object-contain relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+          <div className="relative mb-4 group cursor-default">
+            <div className="absolute inset-0 bg-indigo-500/30 blur-2xl rounded-full group-hover:bg-indigo-500/40 transition-all duration-500"></div>
+            <PompinoLogo className="w-32 h-32 text-white relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
           </div>
 
           <div className="space-y-1">
             <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase drop-shadow-lg">POMPINO</h1>
-            <p className="text-[11px] font-bold text-indigo-300 uppercase tracking-[0.3em] border-t border-white/10 pt-2 mt-2">By Mati Rosas</p>
+            <p className="text-[11px] font-bold text-indigo-300 uppercase tracking-[0.3em] border-t border-white/10 pt-3 mt-3">By Mati Rosas</p>
           </div>
 
           <div className="w-full space-y-4 pt-4">
@@ -136,7 +137,7 @@ const App: React.FC = () => {
           </div>
           
           <div className="pt-8 border-t border-white/5 w-full">
-             <p className="text-[9px] text-white/20 uppercase tracking-widest">v8.1 • BZS Intelligence System</p>
+             <p className="text-[9px] text-white/20 uppercase tracking-widest">v8.2 • BZS Intelligence System</p>
           </div>
         </div>
       </div>
@@ -185,7 +186,9 @@ const App: React.FC = () => {
             </button>
             <div className="flex items-center gap-4 min-w-0">
                {/* Header Logo */}
-               <img src="logo.png" alt="Pompino" className="w-10 h-10 object-contain hidden md:block drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+               <div className="hidden md:block w-12 h-12 bg-white/5 rounded-xl border border-white/5 flex items-center justify-center shadow-lg shadow-black/20">
+                 <PompinoLogo className="w-8 h-8 text-white" />
+               </div>
                
                <div className="flex flex-col">
                   <div className="flex items-center gap-3 mb-0.5">
@@ -198,7 +201,7 @@ const App: React.FC = () => {
                      <h1 className="text-xl md:text-2xl font-black text-white tracking-tight leading-none italic uppercase">
                         POMPINO
                      </h1>
-                     <span className="text-indigo-400/80 text-[10px] font-bold uppercase tracking-widest hidden sm:inline-block border-l border-white/10 pl-2">
+                     <span className="text-indigo-400/80 text-[9px] font-bold uppercase tracking-widest hidden sm:inline-block border-l border-white/10 pl-2">
                         By Mati Rosas
                      </span>
                   </div>

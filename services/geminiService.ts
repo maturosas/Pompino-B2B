@@ -2,9 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { Lead } from "../types";
 
-/**
- * Gets user location for better Maps grounding.
- */
 const getUserCoordinates = (): Promise<{ latitude: number; longitude: number } | null> => {
   return new Promise((resolve) => {
     if (!navigator.geolocation) return resolve(null);
@@ -19,13 +16,17 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const userCoords = await getUserCoordinates();
 
-  // Phase 1: High-Precision Grounding for Real-World Places (Maps + Search)
-  // We use Gemini 2.5 Flash as it supports Google Maps tool.
+  // Phase 1: High-Precision Grounding
   const groundingResponse = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
-    contents: `List businesses of type "${type}" in the area of "${zone}". 
-    Specifically look for phone numbers, emails, and social media presence. 
-    Use Google Maps and Search to find the most recent and verified businesses.`,
+    contents: `Act as a B2B Lead Generation Expert. 
+    Find businesses of type "${type}" in "${zone}". 
+    CRITICAL MISSION: 
+    1. Find their official website URL.
+    2. Find their INSTAGRAM profile link (this is vital for B2B outreach in this sector).
+    3. Find phone numbers. Identify if they are mobile/WhatsApp (often starts with 11, 15, 261, 341 etc. in local formats).
+    4. Find emails from their websites or social bios.
+    5. Use Google Maps for locations and Search for social links.`,
     config: {
       tools: [
         { googleMaps: {} },
@@ -48,23 +49,24 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
   const groundingChunks = groundingResponse.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   const groundingUrls = groundingChunks.map(c => c.maps?.uri || c.web?.uri).filter(Boolean) as string[];
 
-  // Phase 2: Structural Intelligence & Thinking (Structuring & Deducting)
-  // We use Gemini 3 Pro with high thinking budget to parse the messy grounded data into valid JSON 
-  // and deduce missing professional emails/contacts logically.
+  // Phase 2: Structural Intelligence
   const structuringResponse = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
-    contents: `I have the following raw data about businesses:
+    contents: `Analyze this raw business data:
     
     "${rawInformation}"
     
-    Task: Convert this into a structured JSON array for a B2B CRM.
+    Task: Convert to JSON array for CRM.
     
-    Rules:
-    1. Keys: name, location, category, phone, email, website, instagram.
-    2. Category should be specific (e.g., "Vinoteca Boutique", "Distribuidor Mayorista").
-    3. If email is missing, try to deduce it based on business name and standard patterns if possible, or leave as empty string.
-    4. Ensure phone is in international format.
-    5. ONLY return valid JSON. No markdown blocks.`,
+    Data Extraction Strategy:
+    - "name": Official business name.
+    - "phone": Full international format.
+    - "whatsapp": If the phone is a mobile number, put the digits-only version here for wa.me links.
+    - "instagram": Full URL to their Instagram profile.
+    - "website": Official website URL.
+    - "email": Professional or contact email.
+    
+    Format: ONLY return a JSON array. If info is missing, use empty string. No markdown code blocks.`,
     config: {
       thinkingConfig: { thinkingBudget: 32768 }
     }
@@ -72,7 +74,6 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
 
   try {
     let text = structuringResponse.text.trim();
-    // Cleaning possible markdown artifacts
     if (text.startsWith('```')) {
       text = text.replace(/^```json/, '').replace(/```$/, '').trim();
     }
@@ -86,14 +87,14 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
       isClient: false,
       contactName: '',
       notes: '',
-      website: item.website === "N/A" ? "" : item.website,
-      instagram: item.instagram === "N/A" ? "" : item.instagram,
-      sourceUrl: groundingUrls[index % groundingUrls.length] || (groundingUrls.length > 0 ? groundingUrls[0] : ''),
+      website: (item.website && item.website !== "N/A") ? (item.website.startsWith('http') ? item.website : `https://${item.website}`) : "",
+      instagram: (item.instagram && item.instagram !== "N/A") ? (item.instagram.startsWith('http') ? item.instagram : `https://${item.instagram}`) : "",
+      whatsapp: item.whatsapp || (item.phone ? item.phone.replace(/\D/g, '') : ""),
+      sourceUrl: groundingUrls[index % groundingUrls.length] || '',
       savedAt: Date.now()
     }));
   } catch (e) {
     console.error("Data processing error:", e);
-    // Fallback if parsing fails - try to extract anything meaningful
-    throw new Error("El motor de inteligencia falló al estructurar los datos. Intente simplificar la búsqueda.");
+    throw new Error("Error en el procesamiento de inteligencia. Refine los términos de búsqueda.");
   }
 };

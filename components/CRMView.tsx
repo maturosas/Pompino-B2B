@@ -25,16 +25,8 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
   
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // Modal manual lead state
   const [newLead, setNewLead] = useState<Partial<Lead>>({
-    name: '',
-    category: '',
-    location: '',
-    phone: '',
-    email: '',
-    website: '',
-    status: 'discovered',
-    isClient: false
+    name: '', category: '', location: '', phone: '', email: '', website: '', instagram: '', status: 'discovered', isClient: false
   });
 
   useEffect(() => {
@@ -54,28 +46,15 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
     setDateFilter('all');
   };
 
-  const isAnyFilterActive = search !== '' || statusFilter !== 'all' || clientFilter !== 'all' || dateFilter !== 'all';
-
   const processedLeads = useMemo(() => {
     let result = [...leads];
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const todayStr = now.toISOString().split('T')[0];
-    const nextWeek = new Date(now);
-    nextWeek.setDate(now.getDate() + 7);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
     const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(l => 
-        l.name.toLowerCase().includes(q) || 
-        l.category.toLowerCase().includes(q) || 
-        l.location.toLowerCase().includes(q) ||
-        (l.contactName || '').toLowerCase().includes(q) ||
-        (l.notes || '').toLowerCase().includes(q) ||
-        (l.phone || '').includes(q) ||
-        (l.email || '').toLowerCase().includes(q)
-      );
+      result = result.filter(l => l.name.toLowerCase().includes(q) || l.category.toLowerCase().includes(q) || l.location.toLowerCase().includes(q) || (l.contactName || '').toLowerCase().includes(q) || (l.notes || '').toLowerCase().includes(q));
     }
 
     if (statusFilter !== 'all') result = result.filter(l => l.status === statusFilter);
@@ -96,8 +75,6 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
     result.sort((a, b) => {
       let valA: any = a[sortKey as keyof Lead] || '';
       let valB: any = b[sortKey as keyof Lead] || '';
-      if (typeof valA === 'string') valA = valA.toLowerCase();
-      if (typeof valB === 'string') valB = valB.toLowerCase();
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -106,43 +83,25 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
     return result;
   }, [leads, search, sortKey, sortOrder, statusFilter, clientFilter, dateFilter]);
 
-  const suggestions = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q || q.length < 2) return [];
-    const seen = new Set();
-    const matches: any[] = [];
-    for (const lead of leads) {
-      const nameMatch = lead.name.toLowerCase().includes(q);
-      const categoryMatch = lead.category.toLowerCase().includes(q);
-      if ((nameMatch || categoryMatch) && !seen.has(lead.id)) {
-        seen.add(lead.id);
-        matches.push({ id: lead.id, name: lead.name, category: lead.category, type: nameMatch ? 'Entidad' : 'Categoría' });
-      }
-      if (matches.length >= 6) break;
-    }
-    return matches;
-  }, [leads, search]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    else { setSortKey(key); setSortOrder('asc'); }
-  };
-
   const handleExportCSV = () => {
     if (processedLeads.length === 0) return;
+    const headers = ["Nombre", "Categoria", "Ubicacion", "Telefono", "Email", "Web", "Instagram", "Status", "Es Cliente", "Notas", "Seguimiento"];
+    const escape = (str: any) => `"${(str || "").toString().replace(/"/g, '""')}"`;
     
-    const headers = ["Nombre", "Categoría", "Ubicación", "Teléfono", "Email", "Web", "Status", "Cliente", "Notas", "Seguimiento"];
-    const rows = processedLeads.map(l => [
-      l.name, l.category, l.location, l.phone, l.email, l.website || "", 
-      l.status, l.isClient ? "SI" : "NO", l.notes || "", l.followUpDate || ""
-    ]);
-    
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const csvContent = [
+      headers.join(","),
+      ...processedLeads.map(l => [
+        escape(l.name), escape(l.category), escape(l.location), escape(l.phone), escape(l.email), 
+        escape(l.website), escape(l.instagram), escape(l.status), l.isClient ? "SI" : "NO", 
+        escape(l.notes), escape(l.followUpDate)
+      ].join(","))
+    ].join("\n");
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `pompino_b2b_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.href = url;
+    link.setAttribute("download", `pompino_b2b_${new Date().getTime()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -151,36 +110,9 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
   const handleManualAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLead.name) return;
-    
-    const fullLead: Lead = {
-      ...newLead as Lead,
-      id: `manual-${Date.now()}`,
-      savedAt: Date.now(),
-    };
-    
-    onAddManualLead(fullLead);
+    onAddManualLead({ ...newLead as Lead, id: `manual-${Date.now()}`, savedAt: Date.now() });
     setIsAddModalOpen(false);
-    setNewLead({
-      name: '', category: '', location: '', phone: '', email: '', website: '', status: 'discovered', isClient: false
-    });
-  };
-
-  const handleSendEmail = (lead: Lead) => {
-    if (!lead.email || lead.email.includes('no-email')) {
-      alert("No se ha detectado un email válido.");
-      return;
-    }
-    const subject = encodeURIComponent(`Seguimiento B2B - ${lead.name}`);
-    const body = encodeURIComponent(`Hola ${lead.contactName || lead.name},\n\nEspero que estés muy bien...`);
-    window.location.href = `mailto:${lead.email}?subject=${subject}&body=${body}`;
-  };
-
-  const getFollowUpStyles = (date?: string) => {
-    if (!date) return 'text-white/10 border-white/5 bg-transparent';
-    const today = new Date().toISOString().split('T')[0];
-    if (date < today) return 'text-white border-white bg-white/20 shadow-[0_0_15px_rgba(255,255,255,0.3)] font-black ring-1 ring-white/50';
-    if (date === today) return 'text-white border-white/60 bg-white/10 font-bold';
-    return 'text-white/40 border-white/10 bg-transparent';
+    setNewLead({ name: '', category: '', location: '', phone: '', email: '', website: '', instagram: '', status: 'discovered', isClient: false });
   };
 
   const getStatusStyles = (status: string) => {
@@ -188,211 +120,107 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
       case 'closed': return 'text-white border-white bg-white/30 font-black';
       case 'contacted': return 'text-white border-white/60 bg-white/10 font-bold';
       case 'qualified': return 'text-white/70 border-white/30 bg-white/[0.04]';
-      case 'discovered': 
       default: return 'text-white/30 border-white/10 bg-transparent';
     }
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
-      {/* High-Performance Command Center Filter Bar */}
-      <div className="p-4 border-2 border-white rounded-2xl bg-black shadow-[0_20px_60px_rgba(0,0,0,0.8)]">
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-          <div className="flex items-center gap-6 w-full xl:w-auto">
-             <div className="hidden sm:block shrink-0">
-                <h2 className="text-xl font-black text-white uppercase italic tracking-tighter leading-none mb-1">ARCHIVO <span className="text-white/20">DINÁMICO</span></h2>
-                <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.5em]">Real-Time Data Ledger</p>
-             </div>
-             
+    <div className="space-y-4 animate-in fade-in duration-300 max-w-full overflow-hidden">
+      {/* Search & Filters Panel */}
+      <div className="p-4 lg:p-5 border-2 border-white rounded-2xl bg-black shadow-2xl">
+        <div className="flex flex-col xl:flex-row justify-between gap-4">
+          <div className="flex items-center gap-6 flex-1">
              <div className="relative flex-1 xl:w-96" ref={searchRef}>
-               <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/40 z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-               <input
-                 type="text"
-                 placeholder="BUSCAR ENTIDAD, NOTA O CONTACTO..."
-                 value={search}
-                 onChange={(e) => { setSearch(e.target.value); setShowSuggestions(true); }}
-                 onFocus={() => setShowSuggestions(true)}
-                 className={`w-full h-12 bg-black border-2 px-12 rounded-xl text-[11px] font-black text-white placeholder:text-white/10 focus:border-white transition-all outline-none uppercase shadow-inner ${search ? 'border-white' : 'border-white/20'}`}
+               <input 
+                type="text" 
+                placeholder="BUSCAR EN ARCHIVO..." 
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+                className="w-full h-11 lg:h-12 bg-black border-2 border-white/20 px-5 rounded-xl text-[10px] lg:text-[11px] font-black text-white outline-none focus:border-white uppercase placeholder:text-white/10" 
                />
-               {showSuggestions && suggestions.length > 0 && (
-                 <div className="absolute top-full left-0 right-0 mt-2 bg-black border-2 border-white rounded-xl overflow-hidden z-50 shadow-[0_30px_70px_rgba(0,0,0,1)]">
-                   {suggestions.map((s) => (
-                     <button key={s.id} onClick={() => { setSearch(s.name); setShowSuggestions(false); }} className="w-full text-left px-5 py-3 hover:bg-white group transition-all border-b border-white/10 last:border-0 flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-black uppercase text-white group-hover:text-black">{s.name}</span>
-                          <span className="text-[8px] font-black uppercase text-white/30 group-hover:text-black/40 tracking-wider">{s.category}</span>
-                        </div>
-                        <span className="text-[8px] font-black text-white/20 group-hover:text-black/30 italic border border-white/10 group-hover:border-black/10 px-2 py-0.5 rounded">{s.type}</span>
-                     </button>
-                   ))}
-                 </div>
-               )}
              </div>
           </div>
-          
-          <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-            <select 
-              value={statusFilter} 
-              onChange={(e) => setStatusFilter(e.target.value)} 
-              className={`h-12 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${statusFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
-            >
-              <option value="all">TODOS LOS ESTADOS</option>
+          <div className="flex flex-wrap gap-2 sm:grid sm:grid-cols-2 lg:flex lg:flex-row">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-11 lg:h-12 flex-1 bg-black border-2 border-white/20 px-3 lg:px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer">
+              <option value="all">ESTADOS</option>
               <option value="discovered">DESCUBIERTO</option>
               <option value="qualified">CALIFICADO</option>
-              <option value="contacted">EN GESTIÓN</option>
-              <option value="closed">ÉXITO COMERCIAL</option>
+              <option value="contacted">GESTIÓN</option>
+              <option value="closed">ÉXITO</option>
             </select>
-
-            <select 
-              value={clientFilter} 
-              onChange={(e) => setClientFilter(e.target.value as ClientFilter)} 
-              className={`h-12 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${clientFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
-            >
-              <option value="all">TODOS LOS REGISTROS</option>
-              <option value="clients">CARTERA CLIENTES</option>
-              <option value="leads">SOLO PROSPECTOS</option>
+            <select value={clientFilter} onChange={(e) => setClientFilter(e.target.value as ClientFilter)} className="h-11 lg:h-12 flex-1 bg-black border-2 border-white/20 px-3 lg:px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer">
+              <option value="all">UNIVERSO</option>
+              <option value="clients">CARTERA</option>
+              <option value="leads">PROSPECTOS</option>
             </select>
-
-            <select 
-              value={dateFilter} 
-              onChange={(e) => setDateFilter(e.target.value as DateFilter)} 
-              className={`h-12 bg-black border-2 px-4 rounded-xl text-[9px] font-black text-white uppercase outline-none cursor-pointer focus:border-white transition-colors ${dateFilter !== 'all' ? 'border-white' : 'border-white/20'}`}
-            >
-              <option value="all">TODAS LAS FECHAS</option>
-              <option value="overdue">VENCIDOS (!) </option>
-              <option value="today">PLAN PARA HOY</option>
-              <option value="this-week">PRÓX. 7 DÍAS</option>
-              <option value="upcoming">FUTURO CERCANO</option>
-              <option value="none">SIN ASIGNAR</option>
-            </select>
-
-            <div className="h-12 w-px bg-white/10 mx-2 hidden xl:block"></div>
-
-            <button 
-              onClick={() => setIsAddModalOpen(true)}
-              className="h-12 px-6 border-2 border-white/40 text-white text-[10px] font-black uppercase rounded-xl hover:bg-white/10 transition-all flex items-center gap-2 shadow-lg"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-              NUEVO
-            </button>
-
-            <button 
-              onClick={handleExportCSV}
-              className="h-12 px-6 border-2 border-white bg-white text-black text-[10px] font-black uppercase rounded-xl hover:bg-black hover:text-white transition-all flex items-center gap-2 shadow-lg"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M7 10l5 5m0 0l5-5m-5 5V3" /></svg>
-              EXPORTAR CSV
-            </button>
+            <button onClick={() => setIsAddModalOpen(true)} className="h-11 lg:h-12 flex-1 px-4 lg:px-6 border-2 border-white/40 text-white text-[9px] lg:text-[10px] font-black uppercase rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-2">NUEVO</button>
+            <button onClick={handleExportCSV} className="h-11 lg:h-12 flex-1 px-4 lg:px-6 border-2 border-white bg-white text-black text-[9px] lg:text-[10px] font-black uppercase rounded-xl hover:bg-black hover:text-white transition-all flex items-center justify-center gap-2">EXPORTAR</button>
           </div>
         </div>
       </div>
 
-      {/* Extreme Density Intelligence Ledger */}
-      <div className="border-2 border-white/20 rounded-2xl overflow-hidden bg-black shadow-[0_40px_100px_rgba(0,0,0,1)]">
+      {/* Extreme Density Table */}
+      <div className="border-2 border-white/20 rounded-2xl overflow-hidden bg-black shadow-2xl relative">
+        {/* Indicador de scroll para móvil */}
+        <div className="lg:hidden absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
+           <svg className="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+        </div>
+
         <div className="overflow-x-auto custom-scroll">
           <table className="w-full text-left border-collapse min-w-[1200px]">
             <thead>
               <tr className="bg-white/5 text-white/40 text-[9px] font-black uppercase tracking-[0.4em] border-b-2 border-white/20">
-                <th className="px-5 py-3 w-[20%] cursor-pointer hover:text-white transition-colors" onClick={() => toggleSort('name')}>
-                  ENTIDAD {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-2 py-3 w-[4%] text-center">CLI</th>
-                <th className="px-5 py-3 w-[15%]">INTEL CONTACTO</th>
-                <th className="px-5 py-3 w-[12%]">TITULAR GESTIÓN</th>
-                <th className="px-5 py-3 w-[10%] cursor-pointer hover:text-white transition-colors" onClick={() => toggleSort('followUpDate')}>
-                  PROX. ACCIÓN {sortKey === 'followUpDate' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </th>
-                <th className="px-5 py-3 w-[30%]">STATUS & LOG DE NOTAS</th>
-                <th className="px-3 py-3 w-[4%] text-right">OPS</th>
+                <th className="px-5 py-4 w-[20%] cursor-pointer" onClick={() => setSortKey('name')}>ENTIDAD</th>
+                <th className="px-2 py-4 w-[4%] text-center">CLI</th>
+                <th className="px-5 py-4 w-[15%]">CONTACTO</th>
+                <th className="px-5 py-4 w-[12%]">LINKS</th>
+                <th className="px-5 py-4 w-[12%] cursor-pointer" onClick={() => setSortKey('followUpDate')}>FECHA</th>
+                <th className="px-5 py-4 w-[33%]">STATUS & NOTAS</th>
+                <th className="px-3 py-4 w-[4%] text-right">OPS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">
               {processedLeads.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-40 text-center text-white/5 uppercase font-black text-[13px] tracking-[2em] italic">
-                    Sin coincidencias en el Archivo B2B
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="px-5 py-32 text-center text-white/5 uppercase font-black text-[12px] tracking-[1.5em] italic">Buffer de Archivo Vacío</td></tr>
               ) : (
                 processedLeads.map((lead) => (
-                  <tr key={lead.id} className={`group transition-all hover:bg-white/[0.06] ${lead.isClient ? 'bg-white/[0.03]' : 'bg-black'}`}>
-                    <td className="px-5 py-2 leading-none">
-                      <div className="font-black text-white text-[12px] uppercase italic truncate max-w-[220px] mb-0.5 group-hover:translate-x-1 transition-transform">{lead.name}</div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[8px] font-black text-white/60 uppercase tracking-tighter">{lead.category}</span>
-                        <div className="w-1 h-1 bg-white/20 rounded-full"></div>
-                        <span className="text-[8px] font-bold text-white/20 uppercase truncate max-w-[120px]">{lead.location}</span>
+                  <tr key={lead.id} className={`group hover:bg-white/[0.06] ${lead.isClient ? 'bg-white/[0.03]' : 'bg-black'}`}>
+                    <td className="px-5 py-4">
+                      <div className="font-black text-white text-[13px] uppercase italic mb-1 truncate max-w-[200px]">{lead.name}</div>
+                      <span className="text-[8px] text-white/40 uppercase tracking-tighter">{lead.category}</span>
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <button onClick={() => onUpdateLead(lead.id, { isClient: !lead.isClient })} className={`mx-auto w-8 h-4 rounded-full relative border-2 transition-all ${lead.isClient ? 'bg-white border-white' : 'bg-black border-white/20'}`}><div className={`absolute top-0.5 w-2 h-2 rounded-full ${lead.isClient ? 'right-0.5 bg-black' : 'left-0.5 bg-white/20'}`}></div></button>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-white font-black text-[11px] mono truncate">{lead.phone || 'S/N'}</span>
+                        <span className="text-white/30 text-[8px] lowercase italic truncate max-w-[150px]">{lead.email || '---'}</span>
                       </div>
                     </td>
-                    
-                    <td className="px-2 py-2 text-center">
-                      <button 
-                        onClick={() => onUpdateLead(lead.id, { isClient: !lead.isClient })} 
-                        className={`w-8 h-4 rounded-full relative border-2 transition-all ${lead.isClient ? 'bg-white border-white' : 'bg-black border-white/20 hover:border-white/50'}`}
-                      >
-                        <div className={`absolute top-0.5 w-2 h-2 rounded-full transition-all ${lead.isClient ? 'right-0.5 bg-black' : 'left-0.5 bg-white/20'}`}></div>
-                      </button>
-                    </td>
-
-                    <td className="px-5 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex flex-col gap-0 flex-1 overflow-hidden">
-                          <span className="text-white font-black text-[11px] mono truncate leading-tight tracking-tighter">{lead.phone || 'S/N'}</span>
-                          <span className="text-white/30 text-[8px] lowercase truncate italic font-medium">{lead.email || 'no-email@intel.db'}</span>
-                        </div>
-                        {lead.email && !lead.email.includes('no-email') && (
-                          <button onClick={() => handleSendEmail(lead)} className="p-1.5 text-white/20 hover:text-black hover:bg-white rounded border border-white/5 hover:border-white transition-all shadow-xl">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                          </button>
-                        )}
+                    <td className="px-5 py-4">
+                      <div className="flex gap-2">
+                        {lead.instagram && <a href={lead.instagram} target="_blank" className="p-1.5 border border-white/20 rounded hover:bg-white hover:text-black transition-all text-[8px] font-black">IG</a>}
+                        {lead.website && <a href={lead.website} target="_blank" className="p-1.5 border border-white/20 rounded hover:bg-white hover:text-black transition-all text-[8px] font-black">WEB</a>}
+                        {lead.whatsapp && <a href={`https://wa.me/${lead.whatsapp}`} target="_blank" className="p-1.5 border border-white rounded bg-white text-black text-[8px] font-black">WA</a>}
                       </div>
                     </td>
-
-                    <td className="px-5 py-2">
-                      <input 
-                        type="text" 
-                        placeholder="TITULAR..." 
-                        value={lead.contactName || ''} 
-                        onChange={(e) => onUpdateLead(lead.id, { contactName: e.target.value })} 
-                        className="w-full bg-black/60 border-2 border-white/10 focus:border-white rounded-lg px-2.5 py-1 text-[10px] text-white font-black uppercase outline-none h-7 transition-all shadow-inner placeholder:text-white/5" 
-                      />
+                    <td className="px-5 py-4">
+                      <input type="date" value={lead.followUpDate || ''} onChange={(e) => onUpdateLead(lead.id, { followUpDate: e.target.value })} className="bg-black border border-white/20 rounded px-2 py-1 text-[10px] text-white font-black uppercase outline-none focus:border-white" />
                     </td>
-
-                    <td className="px-5 py-2">
-                      <input 
-                        type="date" 
-                        value={lead.followUpDate || ''} 
-                        onChange={(e) => onUpdateLead(lead.id, { followUpDate: e.target.value })} 
-                        className={`w-full bg-black border-2 rounded-lg px-2 py-1 text-[10px] font-black uppercase outline-none h-7 transition-all shadow-xl ${getFollowUpStyles(lead.followUpDate)}`} 
-                      />
-                    </td>
-
-                    <td className="px-5 py-2">
+                    <td className="px-5 py-4">
                       <div className="flex gap-2 items-center">
-                        <select 
-                          value={lead.status} 
-                          onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })} 
-                          className={`border-2 rounded-lg px-3 py-1 text-[9px] font-black uppercase outline-none focus:border-white h-7 transition-all shadow-xl ${getStatusStyles(lead.status)}`}
-                        >
-                          <option value="discovered" className="bg-black text-white/30">DESCUBIERTO</option>
-                          <option value="qualified" className="bg-black text-white/60">CALIFICADO</option>
-                          <option value="contacted" className="bg-black text-white/90">EN GESTIÓN</option>
-                          <option value="closed" className="bg-black text-white">ÉXITO</option>
+                        <select value={lead.status} onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })} className={`border-2 rounded px-2 py-1 text-[8px] font-black uppercase outline-none h-8 ${getStatusStyles(lead.status)}`}>
+                          <option value="discovered" className="bg-black text-white/40">DESC</option>
+                          <option value="qualified" className="bg-black text-white/60">QUAL</option>
+                          <option value="contacted" className="bg-black text-white/90">GEST</option>
+                          <option value="closed" className="bg-black text-white">EXIT</option>
                         </select>
-                        <input 
-                          type="text" 
-                          placeholder="NOTAS DE SEGUIMIENTO..." 
-                          value={lead.notes || ''} 
-                          onChange={(e) => onUpdateLead(lead.id, { notes: e.target.value })} 
-                          className="flex-1 bg-white/[0.03] border-2 border-white/5 rounded-lg px-4 py-1 text-[10px] text-white/80 font-bold placeholder:text-white/5 outline-none focus:border-white italic h-7 transition-all" 
-                        />
+                        <input type="text" value={lead.notes || ''} onChange={(e) => onUpdateLead(lead.id, { notes: e.target.value })} className="flex-1 bg-white/[0.03] border border-white/10 rounded px-3 py-1 text-[10px] text-white outline-none focus:border-white italic h-8" />
                       </div>
                     </td>
-
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={() => onRemove(lead.id)} className="p-1.5 text-white/5 hover:text-white hover:bg-white/10 rounded-lg border border-transparent hover:border-white/30 transition-all opacity-0 group-hover:opacity-100">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
+                    <td className="px-3 py-4 text-right">
+                      <button onClick={() => onRemove(lead.id)} className="p-2 text-white/5 hover:text-white transition-all"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                     </td>
                   </tr>
                 ))
@@ -402,61 +230,51 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onAddM
         </div>
       </div>
 
-      {/* Manual Add Modal */}
+      {/* Responsive Manual Add Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-in fade-in zoom-in duration-200">
-          <div className="bg-black border-2 border-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_100px_rgba(255,255,255,0.1)]">
-            <div className="p-8 border-b border-white/10 flex justify-between items-center">
-              <div>
-                <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">NUEVO REGISTRO</h3>
-                <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em]">Carga Manual de Intel B2B</p>
-              </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-white/20 hover:text-white transition-colors">
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl">
+          <div className="bg-black border-2 border-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 lg:p-10 shadow-2xl custom-scroll">
+            <h3 className="text-xl lg:text-2xl font-black text-white uppercase italic mb-8 flex justify-between items-center">
+              NUEVA ENTIDAD B2B
+              <button onClick={() => setIsAddModalOpen(false)} className="lg:hidden text-white/20">
+                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
-            </div>
-
-            <form onSubmit={handleManualAddSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Nombre de Entidad</label>
-                  <input required type="text" value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+            </h3>
+            <form onSubmit={handleManualAddSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-white/20 uppercase ml-1">Nombre</label>
+                   <input required placeholder="ENTIDAD" value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} className="w-full bg-black border-2 border-white/20 p-4 text-white font-black rounded-xl outline-none focus:border-white text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Categoría / Rubro</label>
-                  <input required type="text" value={newLead.category} onChange={e => setNewLead({...newLead, category: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-white/20 uppercase ml-1">Rubro</label>
+                   <input required placeholder="DISTRIBUIDORA / BAR" value={newLead.category} onChange={e => setNewLead({...newLead, category: e.target.value})} className="w-full bg-black border-2 border-white/20 p-4 text-white font-black rounded-xl outline-none focus:border-white text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Teléfono</label>
-                  <input type="text" value={newLead.phone} onChange={e => setNewLead({...newLead, phone: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-white/20 uppercase ml-1">Teléfono</label>
+                   <input placeholder="+54 9..." value={newLead.phone} onChange={e => setNewLead({...newLead, phone: e.target.value})} className="w-full bg-black border-2 border-white/20 p-4 text-white font-black rounded-xl outline-none focus:border-white text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Email Corporativo</label>
-                  <input type="email" value={newLead.email} onChange={e => setNewLead({...newLead, email: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-white/20 uppercase ml-1">Email</label>
+                   <input placeholder="INFO@..." value={newLead.email} onChange={e => setNewLead({...newLead, email: e.target.value})} className="w-full bg-black border-2 border-white/20 p-4 text-white font-black rounded-xl outline-none focus:border-white text-sm" />
                 </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Ubicación / Dirección</label>
-                  <input type="text" value={newLead.location} onChange={e => setNewLead({...newLead, location: e.target.value})} className="w-full bg-black border-2 border-white/20 focus:border-white rounded-xl h-12 px-4 text-white font-black uppercase outline-none transition-all" />
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-white/20 uppercase ml-1">Website URL</label>
+                   <input placeholder="HTTPS://..." value={newLead.website} onChange={e => setNewLead({...newLead, website: e.target.value})} className="w-full bg-black border-2 border-white/20 p-4 text-white font-black rounded-xl outline-none focus:border-white text-sm" />
+                </div>
+                <div className="space-y-1">
+                   <label className="text-[9px] font-black text-white/20 uppercase ml-1">Instagram URL</label>
+                   <input placeholder="HTTPS://INSTAGRAM..." value={newLead.instagram} onChange={e => setNewLead({...newLead, instagram: e.target.value})} className="w-full bg-black border-2 border-white/20 p-4 text-white font-black rounded-xl outline-none focus:border-white text-sm" />
                 </div>
               </div>
-
-              <div className="pt-6 border-t border-white/10 flex justify-end gap-4">
-                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 h-12 text-[11px] font-black text-white/40 uppercase hover:text-white transition-all tracking-widest">CANCELAR</button>
-                <button type="submit" className="px-10 h-12 bg-white text-black text-[11px] font-black uppercase rounded-xl hover:scale-105 transition-all tracking-[0.2em]">GUARDAR EN ARCHIVO</button>
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4 border-t border-white/10">
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-8 py-3 font-black text-white/40 uppercase text-xs tracking-widest">CANCELAR</button>
+                <button type="submit" className="px-10 py-4 bg-white text-black font-black rounded-xl uppercase text-xs tracking-widest hover:scale-105 transition-transform">GUARDAR REGISTRO</button>
               </div>
             </form>
           </div>
         </div>
       )}
-      
-      <div className="flex justify-between items-center px-4">
-         <div className="text-[8px] text-white/20 uppercase tracking-[0.5em] font-black italic">
-           Base de Datos BZS v7.5 • Archivo Central Segurizado
-         </div>
-         <div className="text-[8px] text-white/5 uppercase tracking-[2em] font-black">
-           High Contrast Engine
-         </div>
-      </div>
     </div>
   );
 };

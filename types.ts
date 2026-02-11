@@ -8,13 +8,14 @@ export interface Lead {
   email: string;
   website?: string;
   instagram?: string;
+  whatsapp?: string; // Nuevo: Para links directos
   status: 'discovered' | 'qualified' | 'contacted' | 'closed';
   sourceUrl?: string;
   savedAt?: number;
   contactName?: string; 
   isClient?: boolean;   
   notes?: string;
-  followUpDate?: string; // Optional date for the next contact
+  followUpDate?: string;
 }
 
 export interface PipelineState {

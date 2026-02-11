@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Lead } from '../types';
 
 interface CRMViewProps {
@@ -8,217 +8,246 @@ interface CRMViewProps {
   onUpdateLead: (id: string, updates: Partial<Lead>) => void;
 }
 
+type SortKey = 'name' | 'category' | 'status' | 'savedAt';
+
 const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
-  const [filter, setFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('savedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  const filteredLeads = leads.filter(l => 
-    l.name.toLowerCase().includes(filter.toLowerCase()) || 
-    l.location.toLowerCase().includes(filter.toLowerCase()) ||
-    l.category.toLowerCase().includes(filter.toLowerCase()) ||
-    (l.contactName || '').toLowerCase().includes(filter.toLowerCase())
-  );
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
+  const processedLeads = useMemo(() => {
+    let result = [...leads];
+
+    // Search filter
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(l => 
+        l.name.toLowerCase().includes(q) || 
+        l.category.toLowerCase().includes(q) || 
+        l.location.toLowerCase().includes(q) ||
+        (l.contactName || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(l => l.status === statusFilter);
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let valA: any = a[sortKey as keyof Lead] || '';
+      let valB: any = b[sortKey as keyof Lead] || '';
+      
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [leads, search, sortKey, sortOrder, statusFilter]);
+
+  // Suggestions logic (Top 5 matches based on name)
   const suggestions = useMemo(() => {
-    const names = leads.map(l => l.name);
-    const categories = leads.map(l => l.category);
-    const locations = leads.map(l => l.location);
-    return Array.from(new Set([...names, ...categories, ...locations])).filter(s => s.length > 0);
-  }, [leads]);
+    if (!search || search.length < 2) return [];
+    return leads
+      .filter(l => l.name.toLowerCase().includes(search.toLowerCase()))
+      .slice(0, 5);
+  }, [leads, search]);
 
-  const getGmailLink = (email: string, businessName: string, contactName?: string) => {
-    const person = contactName ? contactName.split(' ')[0] : 'titular';
-    const subject = encodeURIComponent(`Seguimiento POMPINO B2B - ${businessName}`);
-    const body = encodeURIComponent(`Hola ${person},\n\nEspero que estés muy bien. Te escribo de POMPINO B2B para dar seguimiento a nuestra propuesta comercial para ${businessName}.\n\n¿Tendrás unos minutos esta semana para conversar?\n\nSaludos,\nEquipo Pompino`);
-    return `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
-  };
-
-  const exportCRM = () => {
-    const headers = ['Entidad', 'Contacto', 'Cliente', 'Zona', 'Rubro', 'Telefono', 'Email', 'Website', 'Instagram', 'Status', 'FollowUp', 'Notas'];
-    const rows = filteredLeads.map(l => [
-      l.name, 
-      l.contactName || '', 
-      l.isClient ? 'SI' : 'NO',
-      l.location, 
-      l.category, 
-      l.phone, 
-      l.email,
-      l.website || '',
-      l.instagram || '',
-      l.status,
-      l.followUpDate || '',
-      l.notes || ''
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers, ...rows].map(e => e.join(",")).join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `POMPINO_B2B_DATABASE_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortOrder('asc');
+    }
   };
 
   return (
-    <div className="space-y-2 animate-in slide-in-from-bottom-1 duration-200">
-      {/* Hyper-Condensed Control Bar */}
-      <div className="glass-panel px-3 py-2 rounded-xl shadow-sm border-white/5 bg-white/[0.01] flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-black text-white uppercase italic tracking-tighter">Archivo</h2>
-          <span className="px-1.5 py-0.5 bg-blue-600/10 border border-blue-500/20 text-blue-400 text-[7px] font-black uppercase rounded">
-            {filteredLeads.length} REG
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <input
-              list="crm-suggestions"
-              type="text"
-              placeholder="Filtrar..."
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="pl-7 pr-2 py-1 rounded-md bg-white/[0.03] border border-white/5 text-white font-bold placeholder:text-white/10 focus:border-blue-500/30 outline-none w-[160px] text-[9px]"
-            />
-            <datalist id="crm-suggestions">
-              {suggestions.map((s, idx) => <option key={idx} value={s} />)}
-            </datalist>
-            <svg className="w-3 h-3 absolute left-2 top-1.5 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Search & Filter Bar */}
+      <div className="p-8 border border-white/20 rounded-3xl bg-black shadow-2xl">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter">ARCHIVO CENTRAL <span className="text-white/20">B2B</span></h2>
+            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.4em]">Base de Datos de Inteligencia</p>
           </div>
-          <button 
-            onClick={exportCRM}
-            disabled={filteredLeads.length === 0}
-            className="bg-white text-black hover:bg-blue-600 hover:text-white px-2 py-1 rounded-md font-black text-[7px] uppercase tracking-widest transition-all disabled:opacity-10"
-          >
-            EXP
-          </button>
+          
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            <div className="relative flex-1 lg:w-96" ref={searchRef}>
+              <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <input
+                type="text"
+                placeholder="BUSCAR ENTIDAD O CONTACTO..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                className="w-full h-12 bg-black border border-white/20 px-12 rounded-xl text-xs font-black text-white placeholder:text-white/10 focus:border-white transition-all outline-none"
+              />
+              
+              {/* Instant Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-black border border-white/20 rounded-xl overflow-hidden z-50 shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+                  {suggestions.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setSearch(s.name);
+                        setShowSuggestions(false);
+                      }}
+                      className="w-full text-left px-5 py-3 hover:bg-white hover:text-black transition-colors border-b border-white/5 last:border-0 flex justify-between items-center group"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-black uppercase tracking-widest">{s.name}</span>
+                        <span className="text-[8px] font-bold text-white/30 group-hover:text-black/50 uppercase">{s.category}</span>
+                      </div>
+                      <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-12 bg-black border border-white/20 px-4 rounded-xl text-[10px] font-black text-white uppercase tracking-widest outline-none focus:border-white cursor-pointer"
+            >
+              <option value="all">TODOS LOS STATUS</option>
+              <option value="discovered">DESCUBIERTO</option>
+              <option value="qualified">CALIFICADO</option>
+              <option value="contacted">EN GESTIÓN</option>
+              <option value="closed">CIERRE ÉXITO</option>
+            </select>
+
+            <button className="h-12 px-6 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all active:scale-95 shadow-xl">
+              EXPORTAR CSV
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Extreme Density Ledger View */}
-      <div className="glass-panel rounded-xl overflow-hidden shadow-xl border-white/5 bg-[#040404]">
+      {/* Leads Ledger */}
+      <div className="border border-white/20 rounded-3xl overflow-hidden bg-black shadow-2xl">
         <div className="overflow-x-auto custom-scroll">
-          <table className="w-full text-left table-fixed min-w-[1200px]">
+          <table className="w-full text-left border-collapse min-w-[1300px]">
             <thead>
-              <tr className="bg-white/[0.01] text-white/10 text-[6.5px] font-black uppercase tracking-[0.25em] border-b border-white/5">
-                <th className="px-3 py-1 w-[20%]">Entidad / Rubro</th>
-                <th className="px-2 py-1 w-[5%] text-center">Tipo</th>
-                <th className="px-3 py-1 w-[20%]">Contacto & Redes</th>
-                <th className="px-3 py-1 w-[15%]">Responsable / Titular</th>
-                <th className="px-3 py-1 w-[32%]">Gestión / Status / Notas</th>
-                <th className="px-2 py-1 w-[8%] text-right">Ops</th>
+              <tr className="bg-white/5 text-white/20 text-[9px] font-black uppercase tracking-[0.3em] border-b border-white/20">
+                <th className="px-8 py-5 w-[22%] cursor-pointer hover:text-white transition-colors" onClick={() => toggleSort('name')}>
+                  <div className="flex items-center gap-2">
+                    ENTIDAD / RAZÓN {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </div>
+                </th>
+                <th className="px-6 py-5 w-[8%] text-center">CLIENTE</th>
+                <th className="px-8 py-5 w-[15%]">CONTACTO</th>
+                <th className="px-8 py-5 w-[15%]">TITULAR</th>
+                <th className="px-8 py-5 w-[30%]">SEGUIMIENTO & STATUS</th>
+                <th className="px-8 py-5 w-[10%] text-right">ACCIONES</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.02]">
-              {filteredLeads.length === 0 ? (
+            <tbody className="divide-y divide-white/10">
+              {processedLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center opacity-5">
-                    <p className="text-white font-black uppercase tracking-[1em] text-[6px]">No Data Buffer</p>
+                  <td colSpan={6} className="px-8 py-32 text-center text-white/5 uppercase font-black tracking-[1em] italic text-[10px]">
+                    No se encontraron coincidencias en el archivo
                   </td>
                 </tr>
               ) : (
-                filteredLeads.map((lead) => (
-                  <tr key={lead.id} className={`group/row hover:bg-white/[0.01] ${lead.isClient ? 'bg-blue-600/[0.015]' : ''}`}>
-                    {/* ENTIDAD */}
-                    <td className="px-3 py-1 align-top">
-                      <div className="font-black text-white text-[10px] leading-tight tracking-tighter truncate group-hover/row:text-blue-400 uppercase italic">{lead.name}</div>
-                      <div className="flex items-center gap-1 text-[6.5px] font-bold text-white/15 uppercase tracking-widest truncate">
-                        <span className="text-blue-500/30 shrink-0">{lead.category}</span>
-                        <span>|</span>
-                        <span className="truncate">{lead.location}</span>
+                processedLeads.map((lead) => (
+                  <tr key={lead.id} className={`group transition-all hover:bg-white/[0.04] border-white/5 ${lead.isClient ? 'bg-white/[0.02]' : 'bg-black'}`}>
+                    <td className="px-8 py-7">
+                      <div className="font-black text-white text-[16px] uppercase italic mb-1 group-hover:text-blue-500 transition-colors leading-none tracking-tight">{lead.name}</div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[9px] font-black text-white/30 uppercase tracking-widest">{lead.category}</span>
+                        <span className="w-1 h-1 bg-white/20 rounded-full"></span>
+                        <span className="text-[9px] font-bold text-white/20 uppercase tracking-tighter truncate max-w-[150px]">{lead.location}</span>
                       </div>
                     </td>
                     
-                    {/* CLIENTE TOGGLE */}
-                    <td className="px-2 py-1 align-top text-center">
-                      <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                        <label className="relative inline-flex items-center cursor-pointer scale-[0.6]">
-                          <input 
-                            type="checkbox" 
-                            checked={lead.isClient || false}
-                            onChange={(e) => onUpdateLead(lead.id, { isClient: e.target.checked })}
-                            className="sr-only"
-                          />
-                          <div className={`w-7 h-3.5 bg-white/[0.03] rounded-full transition-all border border-white/5 ${lead.isClient ? 'bg-blue-600/20 border-blue-400/30' : ''}`}></div>
-                          <div className={`absolute left-0.5 top-0.5 w-2.5 h-2.5 bg-white transition-all rounded-full ${lead.isClient ? 'translate-x-3.5 bg-blue-100' : 'bg-white/10'}`}></div>
-                        </label>
+                    <td className="px-6 py-7 text-center">
+                      <button 
+                        onClick={() => onUpdateLead(lead.id, { isClient: !lead.isClient })}
+                        className={`w-14 h-7 rounded-full transition-all relative border-2 ${
+                          lead.isClient ? 'bg-white border-white shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-black border-white/20'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 rounded-full transition-all ${
+                          lead.isClient ? 'right-0.5 bg-black' : 'left-0.5 bg-white/10'
+                        }`}></div>
+                      </button>
+                    </td>
+
+                    <td className="px-8 py-7">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-white font-black text-[13px] mono tracking-tight group-hover:text-white transition-colors">{lead.phone || 'S/N'}</span>
+                        <span className="text-white/20 text-[9px] lowercase font-medium truncate max-w-[180px] group-hover:text-white/40 transition-colors" title={lead.email}>
+                          {lead.email || 'no-email@detected.com'}
+                        </span>
                       </div>
                     </td>
 
-                    {/* CONTACTO */}
-                    <td className="px-3 py-1 align-top">
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1">
-                          <span className="text-white/60 font-black text-[8.5px] tracking-tighter">{lead.phone}</span>
-                          <a href={getGmailLink(lead.email, lead.name, lead.contactName)} target="_blank" className="p-0.5 bg-blue-600/10 text-blue-400/30 rounded hover:text-blue-400 transition-colors">
-                            <svg className="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                          </a>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="text-blue-400/30 font-bold text-[7px] truncate max-w-[80px]">{lead.email}</span>
-                          <div className="flex gap-1.5">
-                            {lead.website && <a href={lead.website} target="_blank" className="text-[5.5px] font-black text-white/10 hover:text-white uppercase">WEB</a>}
-                            {lead.instagram && <a href={lead.instagram.startsWith('http') ? lead.instagram : `https://instagram.com/${lead.instagram.replace('@', '')}`} target="_blank" className="text-[5.5px] font-black text-white/10 hover:text-white uppercase">IG</a>}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* TITULAR */}
-                    <td className="px-3 py-1 align-top">
+                    <td className="px-8 py-7">
                       <input 
                         type="text" 
-                        placeholder="Nombre titular..."
+                        placeholder="N. TITULAR..."
                         value={lead.contactName || ''}
                         onChange={(e) => onUpdateLead(lead.id, { contactName: e.target.value })}
-                        className="w-full bg-white/[0.01] border border-white/5 rounded-md px-1 py-0.5 text-[8.5px] text-white/40 placeholder:text-white/5 outline-none font-bold"
+                        className="w-full bg-black border border-white/10 focus:border-white rounded-xl px-4 py-2.5 text-[11px] text-white font-black uppercase placeholder:text-white/5 outline-none transition-all shadow-inner"
                       />
                     </td>
 
-                    {/* GESTIÓN & STATUS */}
-                    <td className="px-3 py-1 align-top">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex gap-1 items-center">
-                          <select 
-                            value={lead.status}
-                            onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })}
-                            className={`flex-[0.6] bg-black border border-white/5 rounded px-1 py-0.5 text-[6.5px] font-black uppercase tracking-wider outline-none ${
-                              lead.status === 'closed' ? 'text-green-500/60' :
-                              lead.status === 'contacted' ? 'text-blue-400/60' :
-                              'text-white/20'
-                            }`}
-                          >
-                            <option value="discovered">DESC</option>
-                            <option value="qualified">QUAL</option>
-                            <option value="contacted">GEST</option>
-                            <option value="closed">EXIT</option>
-                          </select>
-                          <input 
-                            type="date" 
-                            value={lead.followUpDate || ''}
-                            onChange={(e) => onUpdateLead(lead.id, { followUpDate: e.target.value })}
-                            className="bg-white/[0.01] border border-white/5 rounded px-1 py-0.5 text-[6.5px] text-white/30 font-black outline-none [color-scheme:dark] w-[70px]"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="Nota rápida..."
-                            value={lead.notes || ''}
-                            onChange={(e) => onUpdateLead(lead.id, { notes: e.target.value })}
-                            className="flex-1 bg-white/[0.01] border border-white/5 rounded px-1.5 py-0.5 text-[7.5px] text-white/20 placeholder:text-white/5 outline-none italic truncate"
-                          />
-                        </div>
+                    <td className="px-8 py-7">
+                      <div className="flex gap-3 items-center">
+                        <select 
+                          value={lead.status}
+                          onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })}
+                          className={`bg-black border border-white/20 rounded-xl px-3 py-2.5 text-[10px] font-black uppercase tracking-widest outline-none transition-all focus:border-white cursor-pointer ${
+                            lead.status === 'closed' ? 'text-green-500' :
+                            lead.status === 'contacted' ? 'text-blue-500' : 'text-white/70'
+                          }`}
+                        >
+                          <option value="discovered">DESC</option>
+                          <option value="qualified">QUAL</option>
+                          <option value="contacted">GEST</option>
+                          <option value="closed">EXIT</option>
+                        </select>
+                        <input 
+                          type="text" 
+                          placeholder="AGREGAR NOTA INTERNA..."
+                          value={lead.notes || ''}
+                          onChange={(e) => onUpdateLead(lead.id, { notes: e.target.value })}
+                          className="flex-1 bg-white/[0.03] border border-white/10 rounded-xl px-5 py-2.5 text-[11px] text-white/50 placeholder:text-white/5 outline-none focus:border-white italic transition-all"
+                        />
                       </div>
                     </td>
 
-                    {/* ACCIONES */}
-                    <td className="px-2 py-1 align-top text-right">
+                    <td className="px-8 py-7 text-right">
                       <button 
                         onClick={() => onRemove(lead.id)}
-                        className="p-1 text-white/5 hover:text-red-500/40 transition-colors"
-                        title="Del"
+                        className="p-3 text-white/5 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20"
                       >
-                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </td>
                   </tr>
@@ -227,11 +256,6 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead }) => {
             </tbody>
           </table>
         </div>
-      </div>
-      
-      {/* Zero Space Footer Indicator */}
-      <div className="flex justify-end pr-2 opacity-[0.02]">
-        <span className="text-[5px] font-black uppercase tracking-[2em] text-white">Extreme Ledger Protocol Active</span>
       </div>
     </div>
   );

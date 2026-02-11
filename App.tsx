@@ -3,61 +3,36 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import IntelligenceTool from './components/IntelligenceTool';
 import CRMView from './components/CRMView';
-import CreativeStudio from './components/CreativeStudio';
 import { Lead } from './types';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'intelligence' | 'crm' | 'studio'>('intelligence');
+  const [activeTab, setActiveTab] = useState<'intelligence' | 'crm'>('intelligence');
   const [savedLeads, setSavedLeads] = useState<Lead[]>([]);
   const [scrapedResults, setScrapedResults] = useState<Lead[]>([]);
 
-  // Load both collections on mount
   useEffect(() => {
-    const storedCRM = localStorage.getItem('pompino_b2b_crm_v5');
-    const storedSearch = localStorage.getItem('pompino_b2b_search_v5');
-    
-    if (storedCRM) {
-      try {
-        setSavedLeads(JSON.parse(storedCRM));
-      } catch (e) {
-        console.error("Failed to load CRM data", e);
-      }
-    }
-    
-    if (storedSearch) {
-      try {
-        setScrapedResults(JSON.parse(storedSearch));
-      } catch (e) {
-        console.error("Failed to load search data", e);
-      }
-    }
+    const storedCRM = localStorage.getItem('pompino_b2b_crm_v7');
+    const storedSearch = localStorage.getItem('pompino_b2b_search_v7');
+    if (storedCRM) setSavedLeads(JSON.parse(storedCRM));
+    if (storedSearch) setScrapedResults(JSON.parse(storedSearch));
   }, []);
 
-  // Save CRM leads on change
   useEffect(() => {
-    localStorage.setItem('pompino_b2b_crm_v5', JSON.stringify(savedLeads));
+    localStorage.setItem('pompino_b2b_crm_v7', JSON.stringify(savedLeads));
   }, [savedLeads]);
 
-  // Save Search results on change
   useEffect(() => {
-    localStorage.setItem('pompino_b2b_search_v5', JSON.stringify(scrapedResults));
+    localStorage.setItem('pompino_b2b_search_v7', JSON.stringify(scrapedResults));
   }, [scrapedResults]);
 
   const handleSaveToCRM = (lead: Lead) => {
     if (!savedLeads.find(l => l.id === lead.id)) {
-      setSavedLeads(prev => [{ 
-        ...lead, 
-        savedAt: Date.now(), 
-        isClient: false, 
-        contactName: lead.contactName || '',
-        notes: lead.notes || '',
-        status: 'discovered'
-      }, ...prev]);
+      setSavedLeads(prev => [{ ...lead, savedAt: Date.now(), isClient: false, status: 'discovered' }, ...prev]);
     }
   };
 
   const handleRemoveFromCRM = (id: string) => {
-    if (window.confirm("¿Estás seguro de que quieres eliminar este lead de tu BASE DE DATOS?")) {
+    if (window.confirm("¿CONFIRMAR ELIMINACIÓN DE REGISTRO?")) {
       setSavedLeads(prev => prev.filter(l => l.id !== id));
     }
   };
@@ -66,55 +41,41 @@ const App: React.FC = () => {
     setSavedLeads(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
   };
 
-  const handleSetScrapedResults = (results: Lead[]) => {
-    setScrapedResults(results);
-  };
-
-  const savedIds = new Set(savedLeads.map(l => l.id));
-
   return (
-    <div className="min-h-screen flex bg-black text-white selection:bg-blue-600/40">
+    <div className="min-h-screen flex bg-black text-white selection:bg-white selection:text-black">
       <Sidebar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
         crmCount={savedLeads.length} 
       />
       
-      <main className="ml-72 flex-1 min-h-screen flex flex-col relative overflow-hidden">
-        {/* Glow Particles */}
-        <div className="absolute top-[-15%] right-[-10%] w-[1300px] h-[1100px] bg-blue-600/10 blur-[220px] -z-10 glow-effect rounded-full pointer-events-none"></div>
-        <div className="absolute bottom-[-20%] left-[-10%] w-[900px] h-[900px] bg-indigo-900/15 blur-[200px] -z-10 rounded-full pointer-events-none"></div>
-
-        <header className="px-12 py-8 flex justify-between items-center sticky top-0 bg-black/70 backdrop-blur-3xl z-40 border-b border-white/10">
-          <div className="flex items-center gap-10">
-            <div className="w-1.5 h-12 bg-gradient-to-b from-blue-600 via-blue-400 to-transparent rounded-full hidden sm:block shadow-[0_0_20px_rgba(59,130,246,0.3)]"></div>
-            <div>
-              <div className="flex items-center gap-4 mb-1">
-                <span className="text-blue-400 text-[9px] font-black uppercase tracking-[0.6em] drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">ADMIN POMPINO B2B</span>
-                <span className="text-white/20 text-[9px] font-bold">/</span>
-                <span className="text-white/40 text-[9px] font-black uppercase tracking-[0.4em]">
-                  {activeTab === 'intelligence' ? 'EXPLORADOR' : activeTab === 'crm' ? 'ARCHIVO' : 'STUDIO'}
-                </span>
-              </div>
-              <h1 className="text-4xl font-black text-white tracking-tighter uppercase italic drop-shadow-2xl">
-                POMPINO B2B
-              </h1>
+      <main className="ml-64 flex-1 flex flex-col min-h-screen relative z-10">
+        <header className="px-12 py-10 flex justify-between items-end border-b border-white/10 bg-black sticky top-0 z-40">
+          <div>
+            <div className="flex items-center gap-4 mb-2">
+              <span className="text-white/20 text-[10px] font-black uppercase tracking-[0.6em]">Protocolo B2B v7.0</span>
+              <div className="h-px w-12 bg-white/10"></div>
+              <span className="text-white text-[10px] font-black uppercase tracking-[0.4em]">
+                {activeTab === 'intelligence' ? 'Detección Global' : 'Gestión de Activos'}
+              </span>
             </div>
+            <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic leading-none">
+              POMPINO <span className="text-white/20">B2B</span>
+            </h1>
           </div>
           
-          <div className="hidden lg:flex flex-col items-end gap-0.5">
-            <div className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Partner Intelligence</div>
-            <div className="text-[11px] font-black text-blue-500 uppercase tracking-widest drop-shadow-md">BZS GRUPO BEBIDAS</div>
+          <div className="text-right pb-1">
+            <p className="text-[12px] font-black text-white uppercase tracking-widest italic">BZS GRUPO BEBIDAS</p>
           </div>
         </header>
 
-        <div className="px-12 py-8 flex-1 max-w-[2000px] mx-auto w-full">
+        <div className="px-12 py-12 flex-1 w-full max-w-7xl mx-auto">
           {activeTab === 'intelligence' && (
             <IntelligenceTool 
               leads={scrapedResults}
-              onUpdateLeads={handleSetScrapedResults}
+              onUpdateLeads={setScrapedResults}
               onSaveToCRM={handleSaveToCRM} 
-              savedIds={savedIds} 
+              savedIds={new Set(savedLeads.map(l => l.id))} 
             />
           )}
           {activeTab === 'crm' && (
@@ -124,20 +85,13 @@ const App: React.FC = () => {
               onUpdateLead={handleUpdateLead} 
             />
           )}
-          {activeTab === 'studio' && <CreativeStudio />}
         </div>
 
-        <footer className="px-12 py-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center text-white/20 text-[9px] font-black uppercase tracking-[0.5em] gap-8 bg-[#030303]">
-          <p>© 2024 POMPINO B2B • POWERED BY BZS GRUPO BEBIDAS</p>
-          <div className="flex flex-wrap justify-center gap-10 items-center">
-            <span className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 bg-blue-600/30 rounded-full"></div>
-              Engine v6.1 Stable
-            </span>
-            <span className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 bg-blue-600/30 rounded-full"></div>
-              LocalStorage Persistent
-            </span>
+        <footer className="px-12 py-10 border-t border-white/10 flex justify-between items-center bg-black">
+          <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.5em]">© 2024 • POWERED BY BZS GRUPO BEBIDAS</p>
+          <div className="flex gap-12 text-[9px] font-black text-white/10 uppercase tracking-widest">
+            <span>Interface High-Contrast</span>
+            <span>Grounding Optimized</span>
           </div>
         </footer>
       </main>

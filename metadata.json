@@ -1,8 +1,7 @@
 {
-  "name": "B2B Intel & Creative Studio",
-  "description": "A comprehensive B2B intelligence platform that combines web-based market research via Google Search grounding and a powerful image editing suite powered by Gemini 2.5 Flash Image.",
+  "name": "POMPINO B2B Intel",
+  "description": "High-performance B2B lead generation and CRM platform. Features deep-search web scraping with Google Search and Maps grounding to identify and manage market opportunities.",
   "requestFramePermissions": [
-    "camera",
     "geolocation"
   ]
 }

@@ -27,7 +27,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, crmCount, is
           </div>
           <div className="min-w-0">
             <h1 className="text-lg font-black tracking-tighter text-white uppercase italic leading-none">POMPINO</h1>
-            <p className="text-[8px] font-bold text-white/30 tracking-widest uppercase truncate">BZS BEBIDAS</p>
+            <p className="text-[7px] font-bold text-white/50 tracking-widest uppercase truncate mt-0.5">by Mati Rosas</p>
           </div>
         </div>
         
@@ -71,10 +71,10 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, crmCount, is
 
       <div className="mt-auto pt-6 border-t border-white/5">
         <div className="p-4 rounded-xl bg-white/[0.02] text-center">
-          <p className="text-[7px] font-black text-white/10 uppercase tracking-[0.3em] mb-1">Status</p>
+          <p className="text-[7px] font-black text-white/10 uppercase tracking-[0.3em] mb-2">Tailored for</p>
           <div className="flex items-center justify-center gap-2">
-            <div className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-            <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em]">Intel Core Online</span>
+            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+            <span className="text-[8px] font-black text-white uppercase tracking-[0.2em]">Bzs Grupo bebidas</span>
           </div>
         </div>
       </div>

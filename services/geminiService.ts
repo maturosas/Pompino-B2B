@@ -23,16 +23,40 @@ const getUserCoordinates = (): Promise<{ latitude: number; longitude: number } |
   });
 };
 
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const scrapeLeads = async (zone: string, type: string, isDeepSearch: boolean = true): Promise<Lead[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const userCoords = await getUserCoordinates();
 
+  // Helper para retry con fallback de modelo
+  const generateWithFallback = async (primaryModel: string, fallbackModel: string, prompt: string, tools: any = undefined) => {
+    try {
+      return await ai.models.generateContent({
+        model: primaryModel,
+        contents: prompt,
+        config: { tools }
+      });
+    } catch (error: any) {
+      // Detectamos error de cuota (429)
+      if (error.status === 429 || error.message?.includes('quota') || error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+        console.warn(`Quota exceeded for ${primaryModel}, falling back to ${fallbackModel}`);
+        await wait(2000); // Pausa de 2s antes de intentar con el modelo de respaldo
+        return await ai.models.generateContent({
+          model: fallbackModel,
+          contents: prompt,
+          config: { tools }
+        });
+      }
+      throw error;
+    }
+  };
+
   try {
-    // FASE 1: DESCUBRIMIENTO AGRESIVO (Usamos Pro para mejor razonamiento y síntesis)
-    // El modelo Pro es mucho mejor navegando múltiples herramientas y consolidando listas largas.
-    const discoveryResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: `Eres un experto en inteligencia de mercado y Lead Generation B2B. 
+    // FASE 1: DESCUBRIMIENTO
+    // Intentamos Gemini 3 Pro primero para mayor calidad de búsqueda.
+    // Si falla por cuota, hacemos fallback automático a Gemini 3 Flash.
+    const discoveryPrompt = `Eres un experto en inteligencia de mercado y Lead Generation B2B. 
       OBJETIVO: Encontrar la MAYOR cantidad posible de negocios del rubro "${type}" en la zona de "${zone}" y alrededores inmediatos.
       
       FUENTES OBLIGATORIAS DE BÚSQUEDA:
@@ -45,21 +69,19 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
       - No te detengas en los primeros 5 resultados. Busca listados extensos.
       - Para cada negocio, necesito: Nombre exacto, Dirección, Teléfono (especifica si es WhatsApp), Email corporativo y Perfil de Instagram/Redes.
       - Si encuentras pocos resultados, expande el radio de búsqueda a barrios o localidades vecinas para completar una base de datos robusta.
-      - PRIORIZA: Negocios activos con presencia digital.`,
-      config: {
-        tools: [
-          { googleSearch: {} } // Gemini 3 Pro usa googleSearch de forma excelente para browsing
-        ]
-      }
-    });
+      - PRIORIZA: Negocios activos con presencia digital.`;
+
+    const discoveryResponse = await generateWithFallback(
+      'gemini-3-pro-preview', 
+      'gemini-3-flash-preview', 
+      discoveryPrompt, 
+      [{ googleSearch: {} }]
+    );
 
     const rawInformation = discoveryResponse.text || "No se encontró información básica.";
     
     // FASE 2: ESTRUCTURACIÓN MASIVA
-    // Usamos Flash para procesar el volumen de texto generado por Pro y convertirlo en JSON limpio
-    const structuringResponse = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Analiza la siguiente información de prospección y genera un listado JSON exhaustivo. 
+    const structuringPrompt = `Analiza la siguiente información de prospección y genera un listado JSON exhaustivo. 
       No omitas ningún negocio mencionado.
       
       INFORMACIÓN RECOLECTADA:
@@ -77,26 +99,47 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
       - whatsapp: Solo números
       - email: Email de contacto
       - category: Sub-rubro específico
-      - location: Dirección completa en ${zone}`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              phone: { type: Type.STRING },
-              whatsapp: { type: Type.STRING },
-              email: { type: Type.STRING },
-              category: { type: Type.STRING },
-              location: { type: Type.STRING },
-            },
-            required: ["name", "location"]
-          }
+      - location: Dirección completa en ${zone}`;
+
+    const structuringConfig = {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING },
+            phone: { type: Type.STRING },
+            whatsapp: { type: Type.STRING },
+            email: { type: Type.STRING },
+            category: { type: Type.STRING },
+            location: { type: Type.STRING },
+          },
+          required: ["name", "location"]
         }
       }
-    });
+    };
+
+    let structuringResponse;
+    try {
+        structuringResponse = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: structuringPrompt,
+            config: structuringConfig
+        });
+    } catch (e: any) {
+        // Reintento simple con pausa para la fase de estructuración
+        if (e.status === 429 || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED')) {
+             await wait(3000);
+             structuringResponse = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: structuringPrompt,
+                config: structuringConfig
+             });
+        } else {
+            throw e;
+        }
+    }
 
     const responseText = structuringResponse.text;
     if (!responseText) throw new Error("La IA no pudo procesar el volumen de datos.");
@@ -107,7 +150,7 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
     return rawData.map((item: any, index: number) => ({
       ...item,
       id: `lead-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`,
-      status: 'discovered',
+      status: 'frio',
       isClient: false,
       notes: '',
       whatsapp: item.whatsapp || (item.phone ? item.phone.replace(/\D/g, '') : ""),
@@ -115,8 +158,8 @@ export const scrapeLeads = async (zone: string, type: string, isDeepSearch: bool
     }));
   } catch (e: any) {
     console.error("Critical Scraping Error:", e);
-    if (e.message?.includes("quota") || e.message?.includes("exhausted")) {
-      throw new Error("Límite de búsqueda alcanzado por hoy. Prueba en unos minutos.");
+    if (e.message?.includes("quota") || e.message?.includes("exhausted") || e.status === 429 || e.message?.includes("429")) {
+      throw new Error("⚠️ Sistema sobrecargado (Quota Limit). Espera 1 min o intenta otra zona.");
     }
     throw new Error("Error en la red de inteligencia. Reintenta con términos más generales.");
   }

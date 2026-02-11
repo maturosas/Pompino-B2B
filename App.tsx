@@ -28,7 +28,7 @@ const App: React.FC = () => {
 
   const handleSaveToCRM = (lead: Lead) => {
     if (!savedLeads.find(l => l.id === lead.id)) {
-      setSavedLeads(prev => [{ ...lead, savedAt: Date.now(), isClient: false, status: 'discovered' }, ...prev]);
+      setSavedLeads(prev => [{ ...lead, savedAt: Date.now(), isClient: false, status: 'frio' }, ...prev]);
     }
   };
 
@@ -76,21 +76,21 @@ const App: React.FC = () => {
             </button>
             <div className="flex flex-col min-w-0">
               <div className="hidden sm:flex items-center gap-2 mb-1">
-                <span className="text-white/30 text-[8px] font-black uppercase tracking-[0.3em] whitespace-nowrap">v7.5 Protocol</span>
+                <span className="text-white/30 text-[8px] font-black uppercase tracking-[0.3em] whitespace-nowrap">v8.0 Protocol</span>
                 <div className="h-px w-4 bg-white/10"></div>
                 <span className="text-white/60 text-[8px] font-black uppercase tracking-[0.2em] truncate">
                   {activeTab === 'intelligence' ? 'DETECCIÓN B2B' : 'ARCHIVO INTEL'}
                 </span>
               </div>
               <h1 className="text-lg lg:text-2xl font-black text-white tracking-tighter uppercase italic leading-none truncate">
-                POMPINO <span className="text-white/20">B2B</span>
+                POMPINO <span className="text-white/30 text-sm normal-case font-bold ml-1">by Mati Rosas</span>
               </h1>
             </div>
           </div>
           
-          <div className="flex-shrink-0 ml-4 pl-4 border-l border-white/20 hidden xs:block">
-            <p className="text-[9px] lg:text-[11px] font-black text-white uppercase tracking-[0.2em] italic whitespace-nowrap">
-              BZS <span className="text-white/40">BEBIDAS</span>
+          <div className="flex-shrink-0 ml-4 pl-4 border-l border-white/20 hidden md:block">
+            <p className="text-[9px] lg:text-[10px] font-black text-white uppercase tracking-[0.2em] italic whitespace-nowrap">
+              Tailored for <span className="text-white/40">Bzs Grupo bebidas</span>
             </p>
           </div>
         </header>
@@ -115,10 +115,10 @@ const App: React.FC = () => {
         </div>
 
         <footer className="px-6 lg:px-10 py-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center bg-black gap-4 text-center">
-          <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.4em]">© 2025 • BZS GRUPO BEBIDAS • ARCHIVO CENTRAL</p>
+          <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.4em]">© 2025 • POMPINO by Mati Rosas • BZS GRUPO BEBIDAS</p>
           <div className="hidden sm:flex gap-6 text-[8px] font-black text-white/10 uppercase tracking-[0.2em]">
-            <span>Responsive Native</span>
-            <span>API v2.5 Optimized</span>
+            <span>Tailored Experience</span>
+            <span>v8.0 Optimized</span>
           </div>
         </footer>
       </main>

@@ -7,7 +7,7 @@ export interface Lead {
   phone: string;
   email: string;
   whatsapp?: string;
-  status: 'discovered' | 'qualified' | 'contacted' | 'closed';
+  status: 'frio' | 'contacted' | 'negotiation' | 'client';
   sourceUrl?: string;
   savedAt?: number;
   contactName?: string; 

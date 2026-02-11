@@ -33,14 +33,39 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
         <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scroll bg-black">
           {/* Section: Información Comercial */}
           <section className="space-y-6">
-            <h3 className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] border-b border-white/5 pb-2 italic">Perfil Comercial</h3>
+            <h3 className="text-[11px] font-black text-white/20 uppercase tracking-[0.5em] border-b border-white/5 pb-2 italic">Perfil de Contacto</h3>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Responsable / Dueño</label>
+                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Persona de Contacto</label>
+                <input 
+                  value={lead.contactName || ''} 
+                  onChange={(e) => onUpdate({ contactName: e.target.value })}
+                  placeholder="Ej: Juan Perez..."
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none transition-all uppercase"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Estado del Prospecto</label>
+                <select 
+                  value={lead.status} 
+                  onChange={(e) => onUpdate({ status: e.target.value as any })}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none uppercase font-bold"
+                >
+                  <option value="frio">FRIO</option>
+                  <option value="contacted">CONTACTADO</option>
+                  <option value="negotiation">NEGOCIACION</option>
+                  <option value="client">CLIENTE</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-white/40 uppercase tracking-widest">Responsable Interno</label>
                 <input 
                   value={lead.decisionMaker || ''} 
                   onChange={(e) => onUpdate({ decisionMaker: e.target.value })}
-                  placeholder="Nombre del encargado..."
+                  placeholder="Vendedor asignado..."
                   className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none transition-all"
                 />
               </div>
@@ -69,20 +94,17 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                     <input 
                         value={lead.phone || ''} 
                         onChange={(e) => onUpdate({ phone: e.target.value })}
-                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:border-white outline-none"
                     />
                 </div>
                 <div className="space-y-2">
                     <label className="text-[9px] font-black text-white/40 uppercase tracking-widest flex justify-between">
                         Email (Editable)
-                        <a href={getMapsUrl()} target="_blank" className="text-white hover:text-white/60">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        </a>
                     </label>
                     <input 
                         value={lead.email || ''} 
                         onChange={(e) => onUpdate({ email: e.target.value })}
-                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none"
+                        className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:border-white outline-none"
                     />
                 </div>
             </div>

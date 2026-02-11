@@ -27,54 +27,55 @@ export const scrapeLeads = async (
 ): Promise<void> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  // Prompt optimizado con expansión semántica (sinónimos) y razonamiento geográfico
+  // Prompt RE-INGENIERIZADO para simular extracción de Google Maps y asegurar contacto.
   const prompt = `
-    Actúa como un Agente de Inteligencia Comercial B2B experto en scraping y búsqueda de datos.
+    Eres un experto minero de datos y especialista en scraping de Google Maps / Google Business Profiles.
 
-    OBJETIVO: Identificar y extraer datos de clientes potenciales del rubro "${type}" ubicados en la zona de "${zone}".
+    TU MISIÓN:
+    Encontrar negocios REALES del rubro "${type}" en la zona "${zone}" y extraer sus datos de contacto EXACTOS como si estuvieras leyendo su ficha de Google Maps.
 
-    PROTOCOLOS DE BÚSQUEDA (IMPORTANTE):
-    1. EXPANSIÓN SEMÁNTICA Y DE RUBRO:
-       - NO busques solo la palabra exacta "${type}".
-       - BUSCA ACTIVAMENTE: Sinónimos, variaciones (plurales/diminutivos), y categorías relacionadas del mismo ecosistema.
-       - EJEMPLO: Si el usuario pide "Bar", busca también: "Pubs", "Cervecerías", "Resto-bares", "Cantinas", "Tap Rooms", "Boliches", "Vinotecas".
-       - EJEMPLO: Si pide "Kiosco", busca "Drugstore", "Polirrubro", "Almacén", "Maxikiosco".
+    ESTRATEGIA DE BÚSQUEDA Y VINCULACIÓN (CRÍTICO):
+    1.  **SIMULACIÓN DE MAPS**: Busca específicamente listados de negocios, fichas de Google Maps, directorios locales (Paginas Amarillas, Yelp, Tripadvisor) y perfiles sociales (Instagram/Facebook) donde aparezca el "Botón de llamar" o "Dirección".
+    2.  **CONEXIÓN DE DATOS**: Tu prioridad #1 es vincular [NOMBRE DEL NEGOCIO] + [TELÉFONO]. 
+        - Si encuentras un nombre sin teléfono en un resultado, búscalo inmediatamente en otra fuente (ej: su Instagram) para completar la fila.
+        - NO devuelvas negocios sin ninguna forma de contacto o ubicación, son inútiles para B2B.
+    3.  **VOLUMEN Y PRECISIÓN**:
+        - Barre la zona "${zone}" calle por calle mentalmente.
+        - Busca sinónimos del rubro: (Ej: Si es "Bar", busca también "Cervecería", "Pub", "Restobar", "Gastropub").
 
-    2. INTELIGENCIA GEOGRÁFICA:
-       - Cubre exhaustivamente la zona "${zone}".
-       - Si la zona es un barrio, considera calles principales y zonas comerciales aledañas dentro del mismo radio urbano.
+    FORMATO DE SALIDA (NDJSON ESTRICTO):
+    - Genera un objeto JSON por línea.
+    - NO uses markdown. NO uses comas al final de la línea.
+    - Formato directo para streaming.
 
-    INSTRUCCIONES DE SALIDA (STREAMING NDJSON):
-    - Genera resultados uno por uno en cuanto los encuentres.
-    - Formato: NDJSON (Newline Delimited JSON). Un objeto JSON válido por línea.
-    - SIN comas al final de línea. SIN bloques markdown (\`\`\`json).
-    - SIN texto introductorio.
-
-    SCHEMA JSON REQUERIDO:
+    SCHEMA JSON:
     {
-      "name": "Nombre Comercial Exacto",
-      "category": "Categoría específica detectada (Ej: 'Cervecería' en lugar de 'Bar')",
-      "phone": "Teléfono de contacto (prioridad)",
-      "email": "Email público (si existe)",
-      "location": "Dirección normalizada",
-      "whatsapp": "Solo números (opcional)"
+      "name": "Nombre exacto del cartel/ficha",
+      "category": "Rubro detectado",
+      "location": "Dirección completa (Calle y Altura si es posible, o intersección)",
+      "phone": "Teléfono/WhatsApp (Formato local o internacional)",
+      "email": "Email (si está visible en web/social)",
+      "notes": "Dato extra (ej: 'Abierto ahora', 'Tiene Instagram', 'Rating 4.5')"
     }
 
-    PRIORIDADES:
-    - Negocios activos actualmente.
-    - Datos de contacto (Teléfono/WhatsApp son vitales).
+    EJEMPLO DE RAZONAMIENTO:
+    "Encontré 'El Bar de Moe'. En los resultados veo su ficha de Maps. La dirección es Av. Siempreviva 742. El teléfono listado es 555-1234. Genero JSON."
+
+    IMPORTANTE:
+    - Extrae TODOS los resultados posibles (+30 si existen).
+    - Prioriza celulares (móviles) sobre fijos si es posible, ya que sirven para WhatsApp.
   `;
 
   try {
-    if (onLog) onLog(`> INICIANDO MOTOR SEMÁNTICO (Búsqueda expandida para "${type}")...`);
+    if (onLog) onLog(`> INICIANDO EXTRACTOR DE MAPS & PERFILES (Target: ${type} en ${zone})...`);
     
-    // Usamos Flash para velocidad máxima, o Pro si requerimos razonamiento complejo. 
-    // Flash es mucho más rápido para devolver el primer byte.
+    // Usamos Flash para velocidad máxima, aumentando tokens para permitir listas largas
     const responseStream = await ai.models.generateContentStream({
       model: 'gemini-2.5-flash', 
       contents: prompt,
       config: {
-        tools: [{ googleSearch: {} }] // Grounding activo
+        tools: [{ googleSearch: {} }], // Grounding activo es vital para esto
+        maxOutputTokens: 8192
       }
     });
 
@@ -88,47 +89,41 @@ export const scrapeLeads = async (
       buffer += text;
 
       // Intentar procesar el buffer buscando objetos JSON completos
-      // Buscamos patrones que parezcan líneas JSON completas o bloques cerrados
       const lines = buffer.split('\n');
-      
-      // Procesamos todas las líneas excepto la última (que podría estar incompleta)
-      // A menos que el stream haya terminado, pero aquí estamos en el loop.
       const incompleteLine = lines.pop() || ''; 
       
       for (const line of lines) {
         const cleanLine = cleanJsonString(line);
-        if (cleanLine.length < 5) continue; // Ignorar líneas vacías o ruido
+        if (cleanLine.length < 5) continue; 
 
         try {
-          // Intentar parsear la línea
           const data = JSON.parse(cleanLine);
           
-          if (data && data.name) {
+          // Validación más estricta: Solo guardar si tiene Nombre y (Teléfono o Ubicación)
+          if (data && data.name && (data.phone || data.location)) {
             const lead: Lead = {
               ...data,
-              id: `stream-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+              id: `stream-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               status: 'frio',
               isClient: false,
               savedAt: Date.now(),
               whatsapp: data.whatsapp || (data.phone ? data.phone.replace(/\D/g, '') : ""),
-              notes: `Capturado vía Smart Search (${data.category || type})`
+              notes: data.notes || `Detectado en zona ${zone}`
             };
             
             onLeadFound(lead);
             foundCount++;
-            if (foundCount % 3 === 0 && onLog) onLog(`> ${foundCount} leads identificados...`);
+            if (foundCount % 3 === 0 && onLog) onLog(`> ${foundCount} fichas recuperadas...`);
           }
         } catch (e) {
-          // Si falla el parseo, puede ser que la línea no sea JSON puro todavía.
-          // En un escenario NDJSON estricto esto no debería pasar mucho si el modelo obedece.
-          // Ignoramos el error silenciosamente para no detener el flujo.
+          // Ignorar líneas JSON incompletas o malformadas
         }
       }
       
-      buffer = incompleteLine; // Guardamos lo que sobró para el siguiente chunk
+      buffer = incompleteLine; 
     }
 
-    // Procesar el remanente del buffer al final
+    // Procesar el remanente
     if (buffer.trim()) {
       try {
         const cleanLine = cleanJsonString(buffer);
@@ -141,22 +136,22 @@ export const scrapeLeads = async (
               isClient: false,
               savedAt: Date.now(),
               whatsapp: data.whatsapp || (data.phone ? data.phone.replace(/\D/g, '') : ""),
-              notes: `Capturado vía Smart Search (${data.category || type})`
+              notes: data.notes || `Detectado en zona ${zone}`
             };
             onLeadFound(lead);
+            foundCount++;
         }
       } catch (e) {}
     }
 
-    if (onLog) onLog(`> BÚSQUEDA FINALIZADA. Total: ${foundCount} resultados.`);
+    if (onLog) onLog(`> ESCANEO COMPLETO. ${foundCount} negocios listados.`);
 
   } catch (error: any) {
     console.error("Stream Error:", error);
-    if (onLog) onLog(`> ERROR DE STREAM: ${error.message}`);
+    if (onLog) onLog(`> ERROR DE CONEXIÓN: ${error.message}`);
     
-    // Manejo de cuota simple
     if (error.status === 429 || error.message?.includes('quota')) {
-        if (onLog) onLog(`> CUOTA EXCEDIDA. Reintentando en modo lento...`);
+        if (onLog) onLog(`> ALERTA: Tráfico alto en API. Reintentando...`);
         throw new Error("Quota Exceeded");
     }
   }

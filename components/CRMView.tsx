@@ -13,14 +13,25 @@ interface CRMViewProps {
 }
 
 type SortKey = 'name' | 'category' | 'status' | 'savedAt' | 'followUpDate';
+type DateFilter = 'all' | 'overdue' | 'today' | 'future' | 'unset';
+type TypeFilter = 'all' | 'client' | 'prospect';
 
 const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDetailedUpdate, onAddManualLead, activeFolder }) => {
+  // Search & Sort State
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('savedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Advanced Filter State
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all'); // Used when activeFolder is 'all'
+  
+  // UI State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   
+  // New Lead Form State
   const [newLead, setNewLead] = useState<Partial<Lead>>({
     name: '', category: '', location: '', phone: '', email: '', status: 'frio', isClient: false, contactName: ''
   });
@@ -28,11 +39,12 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
   const processedLeads = useMemo(() => {
     let result = [...leads];
     
-    // Folder Filtering
+    // 1. Sidebar Folder Filter (Base Scope)
     if (activeFolder !== 'all') {
       result = result.filter(l => l.status === activeFolder);
     }
 
+    // 2. Global Search
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(l => 
@@ -44,15 +56,52 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
       );
     }
 
+    // 3. Status Filter (Effective only if activeFolder is 'all')
+    if (activeFolder === 'all' && statusFilter !== 'all') {
+        result = result.filter(l => l.status === statusFilter);
+    }
+
+    // 4. Type Filter (Client vs Prospect)
+    if (typeFilter !== 'all') {
+        if (typeFilter === 'client') {
+            result = result.filter(l => l.status === 'client');
+        } else if (typeFilter === 'prospect') {
+            result = result.filter(l => l.status !== 'client');
+        }
+    }
+
+    // 5. Date Filter (Follow Up)
+    if (dateFilter !== 'all') {
+        const today = new Date().toISOString().split('T')[0];
+        result = result.filter(l => {
+            if (dateFilter === 'unset') return !l.followUpDate;
+            if (!l.followUpDate) return false;
+            
+            if (dateFilter === 'overdue') return l.followUpDate < today;
+            if (dateFilter === 'today') return l.followUpDate === today;
+            if (dateFilter === 'future') return l.followUpDate > today;
+            return true;
+        });
+    }
+
+    // 6. Sorting
     result.sort((a, b) => {
       let valA: any = a[sortKey as keyof Lead] || '';
       let valB: any = b[sortKey as keyof Lead] || '';
+      
+      // Handle date sorting specifically to treat empty as last
+      if (sortKey === 'followUpDate') {
+          if (!valA) valA = '9999-99-99';
+          if (!valB) valB = '9999-99-99';
+      }
+
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
+    
     return result;
-  }, [leads, search, sortKey, sortOrder, activeFolder]);
+  }, [leads, search, sortKey, sortOrder, activeFolder, statusFilter, typeFilter, dateFilter]);
 
   const handleManualAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +154,10 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + location)}`;
   };
 
+  const getWhatsAppLink = (phone: string) => {
+     return `https://wa.me/${phone.replace(/\D/g, '')}`;
+  };
+
   const getFolderName = (id: string) => {
       switch(id) {
           case 'frio': return 'Prospectos Fríos';
@@ -112,6 +165,16 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
           case 'negotiation': return 'En Negociación';
           case 'client': return 'Clientes Activos';
           default: return 'Todos los Registros';
+      }
+  }
+
+  // Toggle sort direction or switch key
+  const handleSort = (key: SortKey) => {
+      if (sortKey === key) {
+          setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+      } else {
+          setSortKey(key);
+          setSortOrder('asc');
       }
   }
 
@@ -124,26 +187,93 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
         </h2>
       </div>
 
-      {/* Compact Toolbar */}
-      <div className="p-3 border border-white/10 rounded-xl bg-[#0a0a0a] shadow-xl">
+      {/* Main Controls Container */}
+      <div className="p-3 md:p-4 border border-white/10 rounded-xl bg-[#0a0a0a] shadow-xl space-y-3">
+        {/* Top Row: Search & Actions */}
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 relative group">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <svg className="h-4 w-4 text-white/30 group-focus-within:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
             <input 
               type="text" 
-              placeholder="BUSCAR EN CARPETA..." 
+              placeholder="BUSCAR EMPRESA, CONTACTO, NOTAS..." 
               value={search} 
               onChange={(e) => setSearch(e.target.value)} 
-              className="w-full h-10 md:h-9 bg-black border border-white/10 px-3 rounded-lg text-xs md:text-[10px] font-bold text-white outline-none focus:border-white uppercase placeholder:text-white/20" 
+              className="w-full h-10 bg-black border border-white/10 pl-10 pr-3 rounded-lg text-xs font-bold text-white outline-none focus:border-white uppercase placeholder:text-white/20 transition-all" 
             />
           </div>
           <div className="flex gap-2 items-center">
-            <button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none h-10 md:h-9 px-3 border border-white/40 text-white text-[10px] font-black uppercase rounded-lg hover:bg-white hover:text-black transition-all flex items-center justify-center gap-1 whitespace-nowrap">
+            <button onClick={() => setIsAddModalOpen(true)} className="flex-1 md:flex-none h-10 px-4 border border-white/40 text-white text-[10px] font-black uppercase rounded-lg hover:bg-white hover:text-black transition-all flex items-center justify-center gap-2 whitespace-nowrap shadow-lg hover:shadow-white/10">
                <span>+ NUEVO</span>
             </button>
-            <button onClick={handleExportCSV} className="flex-1 md:flex-none h-10 md:h-9 px-3 bg-white text-black text-[10px] font-black uppercase rounded-lg hover:bg-black hover:text-white border border-white transition-all flex items-center justify-center gap-1 whitespace-nowrap">
+            <button onClick={handleExportCSV} className="flex-1 md:flex-none h-10 px-4 bg-white text-black text-[10px] font-black uppercase rounded-lg hover:bg-black hover:text-white border border-white transition-all flex items-center justify-center gap-2 whitespace-nowrap">
+               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                <span>CSV</span>
             </button>
           </div>
+        </div>
+
+        {/* Bottom Row: Filters */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-white/5">
+            {/* Filter: Status (Only visible if folder is ALL) */}
+            {activeFolder === 'all' && (
+                <div className="col-span-1">
+                    <select 
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="w-full h-8 bg-white/5 border border-white/10 rounded px-2 text-[9px] font-bold text-white/70 uppercase outline-none focus:border-white/30 focus:text-white"
+                    >
+                        <option value="all">TODOS LOS ESTADOS</option>
+                        <option value="frio">FRIO</option>
+                        <option value="contacted">CONTACTADO</option>
+                        <option value="negotiation">EN NEGOCIACIÓN</option>
+                        <option value="client">CLIENTES</option>
+                    </select>
+                </div>
+            )}
+            
+            {/* Filter: Type (Relationship) */}
+            <div className="col-span-1">
+                <select 
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+                    className="w-full h-8 bg-white/5 border border-white/10 rounded px-2 text-[9px] font-bold text-white/70 uppercase outline-none focus:border-white/30 focus:text-white"
+                >
+                    <option value="all">TIPO: TODOS</option>
+                    <option value="prospect">Solo Prospectos</option>
+                    <option value="client">Solo Clientes</option>
+                </select>
+            </div>
+
+            {/* Filter: Date */}
+            <div className="col-span-1">
+                <select 
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value as DateFilter)}
+                    className={`w-full h-8 bg-white/5 border border-white/10 rounded px-2 text-[9px] font-bold uppercase outline-none focus:border-white/30 transition-colors ${
+                        dateFilter !== 'all' ? 'text-white border-white/40' : 'text-white/70'
+                    }`}
+                >
+                    <option value="all">AGENDA: TODAS</option>
+                    <option value="overdue">⚠️ VENCIDOS</option>
+                    <option value="today">📅 PARA HOY</option>
+                    <option value="future">🔮 FUTUROS</option>
+                    <option value="unset">⚪ SIN FECHA</option>
+                </select>
+            </div>
+            
+            {/* Reset Filters (Visible if any filter is active) */}
+            {(dateFilter !== 'all' || typeFilter !== 'all' || (activeFolder === 'all' && statusFilter !== 'all')) && (
+                 <button 
+                    onClick={() => { setDateFilter('all'); setTypeFilter('all'); setStatusFilter('all'); }}
+                    className="col-span-1 h-8 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded text-[9px] font-black uppercase transition-colors"
+                 >
+                    Limpiar Filtros
+                 </button>
+            )}
         </div>
       </div>
 
@@ -153,7 +283,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
         {/* MOBILE CARDS VIEW */}
         <div className="md:hidden bg-black/50 p-3 space-y-3">
              {processedLeads.length === 0 ? (
-                <div className="py-12 text-center text-white/10 font-black uppercase tracking-[0.2em] text-[10px]">Carpeta vacía</div>
+                <div className="py-12 text-center text-white/10 font-black uppercase tracking-[0.2em] text-[10px]">Sin resultados</div>
              ) : (
                 processedLeads.map(lead => (
                    <div key={lead.id} className="bg-[#0a0a0a] border border-white/10 rounded-lg p-4 space-y-3 relative group active:border-white/30 transition-colors">
@@ -183,7 +313,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
                                 placeholder="TELÉFONO..."
                                 className="flex-1 bg-white/5 border border-transparent focus:border-white/20 rounded px-2 py-1.5 text-xs text-white font-mono placeholder:text-white/10"
                              />
-                             {lead.phone && <a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" className="bg-[#25D366]/20 text-[#25D366] px-2 rounded flex items-center justify-center font-black text-[10px]">WA</a>}
+                             {lead.phone && <a href={getWhatsAppLink(lead.phone)} target="_blank" className="bg-[#25D366]/20 text-[#25D366] px-2 rounded flex items-center justify-center font-black text-[10px]">WA</a>}
                          </div>
                       </div>
 
@@ -203,6 +333,16 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
                              Detalles
                          </button>
                       </div>
+                      
+                      {/* Follow Up Badge */}
+                      {lead.followUpDate && (
+                          <div className={`text-[9px] font-black uppercase mt-2 pt-2 border-t border-dashed border-white/10 flex justify-between items-center ${
+                             lead.followUpDate < new Date().toISOString().split('T')[0] ? 'text-red-400' : 'text-white/30'
+                          }`}>
+                              <span>Agenda: {lead.followUpDate}</span>
+                              {lead.followUpDate < new Date().toISOString().split('T')[0] && <span>⚠️ VENCIDO</span>}
+                          </div>
+                      )}
                    </div>
                 ))
              )}
@@ -213,17 +353,24 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
           <table className="w-full text-left border-collapse min-w-[1000px]">
             <thead>
               <tr className="bg-white/5 text-white/40 text-[9px] font-black uppercase tracking-widest border-b border-white/10">
-                <th className="px-4 py-2 w-[18%]">Entidad</th>
+                <th onClick={() => handleSort('name')} className="px-4 py-2 w-[18%] cursor-pointer hover:text-white transition-colors select-none">
+                    Entidad {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-4 py-2 w-[15%]">Contacto</th>
                 <th className="px-4 py-2 w-[20%]">Datos</th>
                 <th className="px-4 py-2 w-[25%]">Notas</th>
-                <th className="px-4 py-2 w-[17%]">Status</th>
+                <th onClick={() => handleSort('status')} className="px-4 py-2 w-[12%] cursor-pointer hover:text-white transition-colors select-none">
+                    Status {sortKey === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
+                <th onClick={() => handleSort('followUpDate')} className="px-4 py-2 w-[10%] cursor-pointer hover:text-white transition-colors select-none">
+                    Agenda {sortKey === 'followUpDate' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-4 py-2 w-[5%]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {processedLeads.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-white/10 font-black uppercase tracking-[0.5em] text-[10px]">Carpeta vacía</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-white/10 font-black uppercase tracking-[0.5em] text-[10px]">Sin resultados</td></tr>
               ) : (
                 processedLeads.map((lead) => (
                   <tr key={lead.id} className={`hover:bg-white/[0.03] transition-colors group ${lead.status === 'client' ? 'bg-white/[0.02]' : ''}`}>
@@ -253,7 +400,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
                               placeholder="TEL..."
                               className="bg-transparent text-white font-mono text-[9px] outline-none w-24 placeholder:text-white/10"
                             />
-                            {lead.phone && <a href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`} target="_blank" className="text-[7px] font-black bg-white/10 text-white px-1 rounded hover:bg-green-500/80 transition-colors">WA</a>}
+                            {lead.phone && <a href={getWhatsAppLink(lead.phone)} target="_blank" className="text-[7px] font-black bg-white/10 text-white px-1 rounded hover:bg-green-500/80 transition-colors">WA</a>}
                             <a href={getMapsUrl(lead.name, lead.location)} target="_blank" className="text-white/20 hover:text-white transition-colors">
                               <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
                             </a>
@@ -277,17 +424,28 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
                         />
                     </td>
 
-                    {/* Status & Date */}
+                    {/* Status */}
                     <td className="px-4 py-1.5 align-middle">
-                      <div className="flex gap-1.5 items-center">
-                        <select value={lead.status} onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })} className={`border rounded px-1.5 py-0 text-[8px] font-black uppercase h-6 w-24 ${getStatusStyles(lead.status)}`}>
+                        <select value={lead.status} onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })} className={`border rounded px-1.5 py-0 text-[8px] font-black uppercase h-6 w-full ${getStatusStyles(lead.status)}`}>
                           <option value="frio">FRIO</option>
                           <option value="contacted">CONTACTADO</option>
                           <option value="negotiation">EN PROCESO</option>
                           <option value="client">CLIENTE</option>
                         </select>
-                        <input type="date" value={lead.followUpDate || ''} onChange={(e) => onUpdateLead(lead.id, { followUpDate: e.target.value })} className="bg-transparent border border-white/10 rounded px-1 text-[9px] text-white/50 focus:text-white font-bold h-6 w-20" />
-                      </div>
+                    </td>
+
+                    {/* Follow Up Date */}
+                    <td className="px-4 py-1.5 align-middle">
+                        <input 
+                            type="date" 
+                            value={lead.followUpDate || ''} 
+                            onChange={(e) => onUpdateLead(lead.id, { followUpDate: e.target.value })} 
+                            className={`bg-transparent border rounded px-1 text-[9px] font-bold h-6 w-full ${
+                                lead.followUpDate && lead.followUpDate < new Date().toISOString().split('T')[0] 
+                                ? 'border-red-500/50 text-red-400' 
+                                : 'border-white/10 text-white/50 focus:text-white'
+                            }`} 
+                        />
                     </td>
 
                     {/* Actions */}
@@ -309,7 +467,7 @@ const CRMView: React.FC<CRMViewProps> = ({ leads, onRemove, onUpdateLead, onDeta
             onClose={() => setSelectedLead(null)} 
             onUpdate={(u, ctx) => { 
                 if (ctx) onDetailedUpdate(selectedLead.id, u, ctx);
-                else onUpdateLead(selectedLead.id, u); // Fallback for simple updates
+                else onUpdateLead(selectedLead.id, u); 
                 setSelectedLead(prev => prev ? {...prev, ...u} : null); 
             }} 
         />

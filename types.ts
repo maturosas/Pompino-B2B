@@ -70,12 +70,20 @@ export interface TransferRequest {
   timestamp: number;
 }
 
+export interface ChatChannel {
+  id: string;
+  name: string;
+  createdBy: string;
+  isSystem: boolean; // true for default channels
+}
+
 export interface ChatMessage {
   id: string;
   text: string;
   sender: User;
   timestamp: number;
   type: 'text' | 'system'; 
+  channelId?: string; // Optional for backward compatibility (defaults to 'general')
 }
 
 export interface DirectTask {

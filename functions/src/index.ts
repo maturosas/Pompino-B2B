@@ -7,6 +7,10 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// Project Configuration Reference
+// Project ID: pompino-b2b
+// Project Number: 978737789416 (Useful for IAM / Service Account debugging)
+
 // Lazy initialization of BigQuery to prevent cold start crashes
 let bigqueryInstance: BigQuery | null = null;
 const getBigQuery = () => {
@@ -226,7 +230,7 @@ export const getGa4Reports = functions.https.onCall(async (data: any, context: a
               error: true,
               fatal: true,
               message: "Permiso denegado en BigQuery",
-              userHint: `La cuenta de servicio del proyecto ${projectId} no tiene acceso al dataset. Ve a IAM y dale rol 'BigQuery Data Viewer'.`,
+              userHint: `La cuenta de servicio del proyecto ${projectId} (o ${process.env.GCLOUD_PROJECT}) no tiene acceso al dataset. Ve a IAM y dale rol 'BigQuery Data Viewer'.`,
               details: normalized.details
           });
       }

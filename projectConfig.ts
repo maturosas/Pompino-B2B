@@ -16,11 +16,12 @@ export const PROJECT_CONFIG = {
   
   // Usuarios y Contraseñas
   // ROLE: 'admin' tiene permisos totales (asignar, borrar, ver todo). 'user' solo ve lo suyo o lo asignado.
+  // PASSWORD: Ya no se utiliza (acceso abierto).
   users: [
-    { name: 'Mati', password: 'Rosas', color: 'bg-indigo-500', avatar: 'M', role: 'admin' },
-    { name: 'Diego', password: 'Rodriguez', color: 'bg-emerald-500', avatar: 'D', role: 'user' },
-    { name: 'Gaston', password: 'Argibay', color: 'bg-orange-500', avatar: 'G', role: 'user' },
-    { name: 'TESTER', password: 'Tester', color: 'bg-gray-500', avatar: 'T', role: 'user' }
+    { name: 'Mati', password: '', color: 'bg-indigo-500', avatar: 'M', role: 'admin' },
+    { name: 'Diego', password: '', color: 'bg-emerald-500', avatar: 'D', role: 'user' },
+    { name: 'Gaston', password: '', color: 'bg-orange-500', avatar: 'G', role: 'user' },
+    { name: 'TESTER', password: '', color: 'bg-gray-500', avatar: 'T', role: 'user' }
   ]
 };
 

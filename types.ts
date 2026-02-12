@@ -78,6 +78,7 @@ export interface ChatChannel {
   name: string;
   createdBy: string;
   isSystem: boolean; // true for default channels
+  members?: User[]; // Optional: if present, only these users can see/notify
 }
 
 export interface ChatMessage {

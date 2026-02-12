@@ -23,8 +23,9 @@ const getBigQuery = () => {
 // --- EMAIL CONFIGURATION ---
 // ⚠️ IMPORTANT: Configure these variables in Firebase:
 // firebase functions:config:set email.user="tu_email@gmail.com" email.pass="tu_contraseña_de_aplicacion"
-const gmailEmail = functions.config().email?.user || "tu_sistema@gmail.com"; 
-const gmailPassword = functions.config().email?.pass || "password_temporal";
+// Casting functions to any to avoid "Type 'never' has no call signatures" error with v1 import
+const gmailEmail = (functions as any).config().email?.user || "tu_sistema@gmail.com"; 
+const gmailPassword = (functions as any).config().email?.pass || "password_temporal";
 
 const mailTransport = nodemailer.createTransport({
   service: 'gmail',

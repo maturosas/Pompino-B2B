@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
-import { db, collection, setDoc, doc } from '../services/firebaseConfig';
+import { User, DirectTask } from '../types';
+import { db, collection, setDoc, doc, updateDoc } from '../services/firebaseConfig';
 
 interface ReportIssueModalProps {
   isOpen: boolean;
@@ -23,20 +23,35 @@ const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ isOpen, onClose, cu
     setIsSending(true);
 
     try {
+      const now = Date.now();
+      const reportId = `report-${now}`;
+      
       // 1. Save to Firestore (allows backend trigger/email extension to pick it up)
-      const reportId = `report-${Date.now()}`;
       await setDoc(doc(db, "reports", reportId), {
           id: reportId,
           user: currentUser || 'Anonymous',
           message: issueText,
-          timestamp: Date.now(),
+          timestamp: now,
           status: 'new'
       });
 
-      // 2. Show Success Message
+      // 2. Create In-App Notification for Admin (BZS)
+      // This ensures they see it even if email fails
+      const taskId = `task-sys-${now}`;
+      const notification: DirectTask = {
+          id: taskId,
+          fromUser: currentUser || 'Sistema',
+          toUser: 'BZS', // Hardcoded Admin
+          message: `⚠️ REPORTE SISTEMA: ${issueText.substring(0, 50)}...`,
+          status: 'pending',
+          createdAt: now
+      };
+      await setDoc(doc(db, "direct_tasks", taskId), notification);
+
+      // 3. Show Success Message
       setShowSuccess(true);
       
-      // 3. Close after delay
+      // 4. Close after delay
       setTimeout(() => {
           setShowSuccess(false);
           setIssueText('');
@@ -71,7 +86,7 @@ const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ isOpen, onClose, cu
                 </h3>
                 
                 <p className="text-white/60 text-xs mb-4">
-                    Describe el error o sugerencia. Esto enviará una alerta automática a <strong>hola@bzsgrupobebidas.com.ar</strong>.
+                    Describe el error o sugerencia. Esto enviará una alerta automática a <strong>hola@bzsgrupobebidas.com.ar</strong> y un mensaje directo al admin.
                 </p>
 
                 <textarea

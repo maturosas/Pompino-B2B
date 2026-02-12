@@ -16,6 +16,15 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.name + ' ' + lead.location)}`;
   };
 
+  const initiateCloseSale = () => {
+      // Logic: If already client, just update without asking amount (bonus applies only to first sale)
+      if (lead.isClient) {
+          onUpdate({ status: 'client', nextAction: 'sale' }, 'Actualización Cliente');
+          return;
+      }
+      setIsClosing(true);
+  };
+
   const handleCloseSale = () => {
       const value = parseFloat(saleAmount);
       if (isNaN(value) || value <= 0) {
@@ -28,7 +37,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
           isClient: true, 
           nextAction: 'sale',
           saleValue: value
-      }, `Cierre Venta: $${value}`);
+      }, `Cierre Primer Venta: $${value}`);
       
       setIsClosing(false);
   };
@@ -217,7 +226,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                </a>
            )}
            
-           {lead.status !== 'client' ? (
+           {lead.status !== 'client' || !lead.isClient ? (
                isClosing ? (
                     <div className="flex-1 flex gap-2 animate-in slide-in-from-bottom-2">
                          <div className="flex-1 relative">
@@ -230,7 +239,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                                 placeholder="$ 0"
                                 className="w-full h-12 md:h-14 bg-emerald-900/20 border border-emerald-500/50 rounded-2xl px-4 text-white font-black text-lg outline-none focus:bg-emerald-900/30"
                              />
-                             <p className="absolute -bottom-4 left-1 text-[8px] text-emerald-400/70">Escribir únicamente el valor de la primer venta</p>
+                             <p className="absolute -bottom-4 left-1 text-[8px] text-emerald-400/70">Solo válido para la primera venta</p>
                          </div>
                          <button 
                             onClick={handleCloseSale}
@@ -247,7 +256,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                     </div>
                ) : (
                    <button 
-                    onClick={() => setIsClosing(true)}
+                    onClick={initiateCloseSale}
                     className="flex-1 h-12 md:h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest hover:bg-emerald-400 active:scale-95 transition-all shadow-xl shadow-emerald-900/20"
                    >
                      ¡Cerrar Venta! 🚀

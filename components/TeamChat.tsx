@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, ChatChannel, User } from '../types';
-import { getUserColor, isUserAdmin } from '../projectConfig';
+import { getUserColor, isUserAdmin, getUserNames } from '../projectConfig';
 import { doc, deleteDoc, updateDoc, db } from '../services/firebaseConfig';
 
 interface TeamChatProps {
@@ -9,24 +9,36 @@ interface TeamChatProps {
   channels: ChatChannel[];
   currentUser: User;
   onSendMessage: (text: string, channelId: string) => void;
-  onCreateChannel: (name: string) => void;
+  onCreateChannel: (name: string, members?: string[]) => void;
 }
 
 const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, onSendMessage, onCreateChannel }) => {
   const [activeChannelId, setActiveChannelId] = useState('general');
   const [inputText, setInputText] = useState('');
+  
+  // Channel Creation State
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   
   // Mobile UI State: true = show list, false = show chat
   const [showMobileList, setShowMobileList] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+  const allUsers = getUserNames();
   const isAdmin = isUserAdmin(currentUser);
 
   // Filter messages for active channel
   const activeMessages = messages.filter(m => (m.channelId || 'general') === activeChannelId);
+
+  // Filter channels visible to current user
+  const visibleChannels = channels.filter(c => {
+      // Public channels (no members array) are visible to all
+      if (!c.members || c.members.length === 0) return true;
+      // Private channels only visible if user is in members list or is Creator
+      return c.members.includes(currentUser) || c.createdBy === currentUser || isAdmin; 
+  });
 
   // Auto-scroll
   useEffect(() => {
@@ -43,35 +55,41 @@ const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, on
   const handleCreateSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!newChannelName.trim()) return;
-      onCreateChannel(newChannelName);
+      
+      const members = isPrivate ? [...selectedMembers, currentUser] : undefined;
+      onCreateChannel(newChannelName, members);
+      
+      // Reset
       setNewChannelName('');
+      setIsPrivate(false);
+      setSelectedMembers([]);
       setIsCreatingChannel(false);
+  };
+
+  const toggleMember = (user: string) => {
+      if (selectedMembers.includes(user)) {
+          setSelectedMembers(prev => prev.filter(u => u !== user));
+      } else {
+          setSelectedMembers(prev => [...prev, user]);
+      }
   };
 
   const handleDeleteChannel = async (e: React.MouseEvent, channelId: string) => {
       e.stopPropagation();
       if (!window.confirm("¿Seguro que quieres eliminar este canal y todos sus mensajes?")) return;
-      
       try {
-          // Delete Channel Document
           await deleteDoc(doc(db, "chat_channels", channelId));
-          // Ideally we should delete messages too, but for now we leave them orphaned or need a cloud function
           if (activeChannelId === channelId) setActiveChannelId('general');
-      } catch(error) {
-          console.error("Error deleting channel:", error);
-      }
+      } catch(error) { console.error(error); }
   };
 
   const handleRenameChannel = async (e: React.MouseEvent, channelId: string) => {
       e.stopPropagation();
       const newName = prompt("Nuevo nombre del canal:");
       if (!newName) return;
-      
       try {
           await updateDoc(doc(db, "chat_channels", channelId), { name: newName });
-      } catch(error) {
-          console.error("Error updating channel:", error);
-      }
+      } catch(error) { console.error(error); }
   };
 
   const formatTime = (timestamp: number) => {
@@ -103,18 +121,21 @@ const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, on
 
           <div className="flex-1 overflow-y-auto custom-scroll p-2 space-y-1">
               <p className="px-2 text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1 mt-2">Temas Activos</p>
-              {channels.map(channel => (
+              {visibleChannels.map(channel => {
+                  const isPrivateChat = channel.members && channel.members.length > 0;
+                  return (
                   <button
                     key={channel.id}
                     onClick={() => selectChannel(channel.id)}
                     className={`w-full text-left px-4 py-3.5 rounded-xl text-xs font-medium transition-all flex items-center justify-between group ${activeChannelId === channel.id ? 'bg-rose-900/40 text-white font-bold shadow-lg border border-rose-500/20' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                       <div className="flex items-center gap-3 min-w-0">
-                          <span className="opacity-50 text-sm">#</span>
+                          <span className="opacity-50 text-sm">{isPrivateChat ? '🔒' : '#'}</span>
                           <span className="truncate">{channel.name}</span>
                       </div>
                       
-                      {isAdmin && !channel.isSystem && (
+                      {/* Admin can edit ANY channel. Creator can edit their own private channels. */}
+                      {(isAdmin || (!channel.isSystem && channel.createdBy === currentUser)) && (
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <span 
                                 onClick={(e) => handleRenameChannel(e, channel.id)}
@@ -133,8 +154,8 @@ const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, on
                           </div>
                       )}
                   </button>
-              ))}
-              {channels.length === 0 && (
+              )})}
+              {visibleChannels.length === 0 && (
                   <div className="px-3 py-2 text-[10px] text-white/30 italic">Cargando temas...</div>
               )}
           </div>
@@ -227,16 +248,48 @@ const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, on
       {isCreatingChannel && (
           <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
               <div className="bg-[#111] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-                  <h3 className="text-lg font-black text-white uppercase italic mb-4">Crear Nuevo Tema</h3>
+                  <h3 className="text-lg font-black text-white uppercase italic mb-4">Crear Nuevo Chat</h3>
                   <form onSubmit={handleCreateSubmit}>
-                      <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1 block">Nombre del Tema</label>
-                      <input 
-                          autoFocus
-                          value={newChannelName}
-                          onChange={(e) => setNewChannelName(e.target.value)}
-                          placeholder="Ej: Salidas de fin de semana..."
-                          className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-sm outline-none focus:border-rose-500 mb-4"
-                      />
+                      <div className="mb-4">
+                          <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1 block">Nombre</label>
+                          <input 
+                              autoFocus
+                              value={newChannelName}
+                              onChange={(e) => setNewChannelName(e.target.value)}
+                              placeholder="Ej: Proyecto Verano"
+                              className="w-full h-12 bg-white/5 border border-white/10 rounded-xl px-4 text-white text-sm outline-none focus:border-rose-500"
+                          />
+                      </div>
+                      
+                      <div className="mb-4">
+                          <label className="flex items-center gap-2 cursor-pointer mb-2">
+                              <input 
+                                  type="checkbox" 
+                                  checked={isPrivate} 
+                                  onChange={(e) => setIsPrivate(e.target.checked)} 
+                                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-rose-500 focus:ring-rose-500"
+                              />
+                              <span className="text-[10px] font-bold text-white uppercase tracking-widest">¿Es Privado?</span>
+                          </label>
+                          
+                          {isPrivate && (
+                              <div className="bg-white/5 border border-white/5 rounded-xl p-3 max-h-40 overflow-y-auto custom-scroll">
+                                  <p className="text-[9px] text-white/40 mb-2 uppercase">Seleccionar Participantes:</p>
+                                  {allUsers.filter(u => u !== currentUser).map(user => (
+                                      <label key={user} className="flex items-center gap-2 mb-1.5 cursor-pointer hover:bg-white/5 p-1 rounded">
+                                          <input 
+                                              type="checkbox" 
+                                              checked={selectedMembers.includes(user)}
+                                              onChange={() => toggleMember(user)}
+                                              className="w-3 h-3 rounded bg-black border-white/20"
+                                          />
+                                          <span className="text-xs text-white">{user}</span>
+                                      </label>
+                                  ))}
+                              </div>
+                          )}
+                      </div>
+
                       <div className="flex justify-end gap-2">
                           <button type="button" onClick={() => setIsCreatingChannel(false)} className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white uppercase">Cancelar</button>
                           <button type="submit" disabled={!newChannelName.trim()} className="px-6 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black uppercase rounded-lg shadow-lg disabled:opacity-50">Crear</button>

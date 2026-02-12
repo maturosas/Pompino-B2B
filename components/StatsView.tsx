@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Lead } from '../types';
-import { getUserNames } from '../projectConfig';
+import { getUserNames, isCommissionEligible } from '../projectConfig';
 
 interface StatsViewProps {
   leads: Lead[];
@@ -19,13 +19,6 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
   };
 
   // --- CRM LOGIC ---
-  const filteredLeads = useMemo(() => {
-      // Filter clients closed in selected month (based on lastContactDate which is updated on close)
-      // or filter ALL leads if we are just counting status
-      // We will create specific datasets
-      return leads; 
-  }, [leads]);
-
   const closedSalesInMonth = useMemo(() => {
       return leads.filter(l => {
           if (l.status !== 'client') return false;
@@ -37,16 +30,9 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
 
   const crmStats = useMemo(() => {
     const totalLeads = leads.length;
-    
-    // Clients Total (Global)
     const clients = leads.filter(l => l.status === 'client').length;
-    
-    // Conversion Rate
     const conversionRate = totalLeads > 0 ? ((clients / totalLeads) * 100).toFixed(1) : '0.0';
-    
     const negotiation = leads.filter(l => l.status === 'negotiation').length;
-    
-    // Monthly Revenue
     const monthlyRevenue = closedSalesInMonth.reduce((sum, l) => sum + (l.saleValue || 0), 0);
 
     return { totalLeads, clients, conversionRate, negotiation, monthlyRevenue };
@@ -61,20 +47,31 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
     ].filter(item => item.value > 0);
   }, [leads]);
 
-  const teamPerformanceData = useMemo(() => {
+  // ALL Users data for the Chart (Total Revenue)
+  const chartData = useMemo(() => {
     return getUserNames().map(user => {
-        // Sales for this user in selected month
         const userSales = closedSalesInMonth.filter(l => l.owner === user);
         const revenue = userSales.reduce((sum, l) => sum + (l.saleValue || 0), 0);
-        const bonus = revenue * 0.04; // 4% calculation
-
-        return {
-            name: user,
-            revenue,
-            bonus,
-            salesCount: userSales.length
-        };
+        return { name: user, revenue };
     }).sort((a, b) => b.revenue - a.revenue); 
+  }, [closedSalesInMonth]);
+
+  // ELIGIBLE Users data for the Bonus Table (Excludes BZS/Admins if configured)
+  const bonusTableData = useMemo(() => {
+    return getUserNames()
+        .filter(user => isCommissionEligible(user)) // Filter out non-eligible users
+        .map(user => {
+            const userSales = closedSalesInMonth.filter(l => l.owner === user);
+            const revenue = userSales.reduce((sum, l) => sum + (l.saleValue || 0), 0);
+            const bonus = revenue * 0.04; // 4% calculation
+
+            return {
+                name: user,
+                revenue,
+                bonus,
+                salesCount: userSales.length
+            };
+        }).sort((a, b) => b.revenue - a.revenue); 
   }, [closedSalesInMonth]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -151,7 +148,7 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
                 </div>
             </div>
             
-            {/* BONOS & SALES TABLE */}
+            {/* BONOS & SALES TABLE (Filtered for Commission Eligible Users) */}
             <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 shadow-xl overflow-hidden">
                 <h3 className="text-sm font-black text-white uppercase tracking-wide mb-6 flex items-center gap-2">
                     <span className="text-xl">💰</span> Bonos y Comisiones ({selectedMonth})
@@ -167,7 +164,7 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
                             </tr>
                         </thead>
                         <tbody className="text-sm">
-                            {teamPerformanceData.map(user => (
+                            {bonusTableData.map(user => (
                                 <tr key={user.name} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                                     <td className="px-4 py-3 font-bold text-white">{user.name}</td>
                                     <td className="px-4 py-3 text-white/60">{user.salesCount}</td>
@@ -175,9 +172,9 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
                                     <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">{formatCurrency(user.bonus)}</td>
                                 </tr>
                             ))}
-                            {teamPerformanceData.length === 0 && (
+                            {bonusTableData.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-4 py-8 text-center text-white/20 uppercase text-xs">Sin ventas registradas este mes</td>
+                                    <td colSpan={4} className="px-4 py-8 text-center text-white/20 uppercase text-xs">Sin ventas elegibles para bono este mes</td>
                                 </tr>
                             )}
                         </tbody>
@@ -185,16 +182,16 @@ const StatsView: React.FC<StatsViewProps> = ({ leads = [] }) => {
                 </div>
             </div>
 
-            {/* CHARTS */}
+            {/* CHARTS (Shows ALL Users) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col h-[400px]">
                     <h3 className="text-sm font-black text-white uppercase tracking-wide mb-6">Distribución de Estados (Global)</h3>
                     <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={crmPieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value" stroke="none">{crmPieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><Tooltip content={<CustomTooltip />} /><Legend verticalAlign="bottom" /></PieChart></ResponsiveContainer>
                 </div>
                 <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col h-[400px]">
-                    <h3 className="text-sm font-black text-white uppercase tracking-wide mb-6">Facturación por Vendedor ({selectedMonth})</h3>
+                    <h3 className="text-sm font-black text-white uppercase tracking-wide mb-6">Facturación Total ({selectedMonth})</h3>
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={teamPerformanceData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
                             <XAxis dataKey="name" stroke="#ffffff50" fontSize={10} />
                             <YAxis stroke="#ffffff50" fontSize={10} />

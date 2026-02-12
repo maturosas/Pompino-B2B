@@ -204,11 +204,20 @@ const App: React.FC = () => {
   useEffect(() => {
       if (activeTab !== 'chat' && chatMessages.length > 0) {
           const lastMsg = chatMessages[chatMessages.length - 1];
-          if (Date.now() - lastMsg.timestamp < 3000) {
-              setUnreadChatCount(prev => prev + 1);
-          }
+          // 1. Is Recent?
+          const isRecent = Date.now() - lastMsg.timestamp < 3000;
+          if (!isRecent) return;
+
+          // 2. Ignore General Channel
+          if (lastMsg.channelId === 'general') return;
+
+          // 3. If Private Channel, only notify if user is member
+          const channel = chatChannels.find(c => c.id === lastMsg.channelId);
+          if (channel && channel.members && !channel.members.includes(currentUser || '')) return;
+
+          setUnreadChatCount(prev => prev + 1);
       }
-  }, [chatMessages]);
+  }, [chatMessages, chatChannels, currentUser]);
 
 
   // Init Local Data
@@ -406,14 +415,15 @@ const App: React.FC = () => {
     } catch (e) { console.error("Error sending message", e); }
   };
 
-  const handleCreateChannel = async (channelName: string) => {
+  const handleCreateChannel = async (channelName: string, members?: string[]) => {
       if (!currentUser) return;
       const id = channelName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const newChannel: ChatChannel = {
           id,
           name: channelName,
           createdBy: currentUser,
-          isSystem: false
+          isSystem: false,
+          members: members
       };
       await setDoc(doc(db, "chat_channels", newChannel.id), newChannel);
   };

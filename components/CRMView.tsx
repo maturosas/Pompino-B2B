@@ -170,10 +170,13 @@ const CRMView: React.FC<CRMViewProps> = ({
 
   // Special handler for status change in dropdown
   const handleStatusChange = (id: string, newStatus: string) => {
-      if (newStatus === 'client') {
+      const lead = leads.find(l => l.id === id);
+      if (newStatus === 'client' && (!lead?.isClient)) {
+          // Ask for money ONLY if it wasn't a client before
           setLeadToClose(id);
           setClosingSaleAmount('');
       } else {
+          // Just update status if already a client or other status
           onUpdateLead(id, { status: newStatus as any });
       }
   };

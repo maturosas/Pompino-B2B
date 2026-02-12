@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Lead } from '../types';
 
 interface LeadDetailPanelProps {
@@ -9,8 +9,28 @@ interface LeadDetailPanelProps {
 }
 
 const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpdate }) => {
+  const [isClosing, setIsClosing] = useState(false);
+  const [saleAmount, setSaleAmount] = useState('');
+
   const getMapsUrl = () => {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.name + ' ' + lead.location)}`;
+  };
+
+  const handleCloseSale = () => {
+      const value = parseFloat(saleAmount);
+      if (isNaN(value) || value <= 0) {
+          alert("Por favor ingresa un monto válido mayor a 0.");
+          return;
+      }
+
+      onUpdate({ 
+          status: 'client', 
+          isClient: true, 
+          nextAction: 'sale',
+          saleValue: value
+      }, `Cierre Venta: $${value}`);
+      
+      setIsClosing(false);
   };
 
   return (
@@ -161,6 +181,14 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                 className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-white outline-none resize-none italic"
               />
             </div>
+
+            {/* Venta Info Display */}
+            {lead.status === 'client' && lead.saleValue && (
+                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">1ra Venta Cerrada</p>
+                    <p className="text-2xl font-black text-white">$ {lead.saleValue.toLocaleString('es-AR')}</p>
+                </div>
+            )}
           </section>
 
           {/* Section: Historial */}
@@ -190,15 +218,45 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
            )}
            
            {lead.status !== 'client' ? (
-               <button 
-                onClick={() => onUpdate({ status: 'client', isClient: true, nextAction: 'sale' }, 'Cierre Venta 🚀')}
-                className="flex-1 h-12 md:h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest hover:bg-emerald-400 active:scale-95 transition-all shadow-xl shadow-emerald-900/20"
-               >
-                 ¡Cerrar Venta! 🚀
-               </button>
+               isClosing ? (
+                    <div className="flex-1 flex gap-2 animate-in slide-in-from-bottom-2">
+                         <div className="flex-1 relative">
+                             <span className="absolute -top-3 left-0 text-[9px] text-white/50 font-bold bg-black px-1">Importe 1ra Venta (ARS)</span>
+                             <input 
+                                autoFocus
+                                type="number" 
+                                value={saleAmount}
+                                onChange={(e) => setSaleAmount(e.target.value)}
+                                placeholder="$ 0"
+                                className="w-full h-12 md:h-14 bg-emerald-900/20 border border-emerald-500/50 rounded-2xl px-4 text-white font-black text-lg outline-none focus:bg-emerald-900/30"
+                             />
+                             <p className="absolute -bottom-4 left-1 text-[8px] text-emerald-400/70">Escribir únicamente el valor de la primer venta</p>
+                         </div>
+                         <button 
+                            onClick={handleCloseSale}
+                            className="w-14 h-12 md:h-14 bg-emerald-500 hover:bg-emerald-400 text-black rounded-2xl flex items-center justify-center shadow-lg transition-all"
+                         >
+                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                         </button>
+                         <button 
+                            onClick={() => setIsClosing(false)}
+                            className="w-14 h-12 md:h-14 bg-white/10 hover:bg-white/20 text-white rounded-2xl flex items-center justify-center transition-all"
+                         >
+                             ✕
+                         </button>
+                    </div>
+               ) : (
+                   <button 
+                    onClick={() => setIsClosing(true)}
+                    className="flex-1 h-12 md:h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest hover:bg-emerald-400 active:scale-95 transition-all shadow-xl shadow-emerald-900/20"
+                   >
+                     ¡Cerrar Venta! 🚀
+                   </button>
+               )
            ) : (
-                <div className="flex-1 h-12 md:h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest text-emerald-400">
-                    Cliente Activo
+                <div className="flex-1 h-12 md:h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col items-center justify-center font-black uppercase text-emerald-400">
+                    <span className="text-[10px] tracking-widest">Cliente Activo</span>
+                    {lead.saleValue && <span className="text-xs text-white opacity-80">$ {lead.saleValue.toLocaleString('es-AR')}</span>}
                 </div>
            )}
         </footer>

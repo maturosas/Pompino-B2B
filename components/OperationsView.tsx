@@ -34,7 +34,7 @@ const OperationsView: React.FC<OperationsViewProps> = ({ logs, onBackup, onResto
       {/* Access Control Panel */}
       <div className="grid grid-cols-1 gap-6">
           <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 md:p-6 shadow-xl relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[80px] rounded-full pointer-events-none"></div>
+               {/* REMOVED BLUE BLUR */}
                <div className="relative z-10">
                    <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-4 flex items-center gap-2">
                        <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_#6366f1]"></span>

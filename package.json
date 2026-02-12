@@ -19,7 +19,8 @@
     "firebase-functions": "^7.0.5",
     "firebase-admin": "^13.6.1",
     "@google-analytics/data": "^5.2.1",
-    "@google-cloud/bigquery": "^8.1.1"
+    "@google-cloud/bigquery": "^8.1.1",
+    "nodemailer": "^8.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

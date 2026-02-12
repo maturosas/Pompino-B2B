@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Lead, User } from '../types';
 import { PompinoLogo } from './PompinoLogo';
 import { PROJECT_CONFIG, getUserNames, isUserAdmin } from '../projectConfig';
@@ -20,6 +20,7 @@ interface SidebarProps {
   pendingTasksCount: number; 
   onOpenTaskCreator: () => void; 
   onOpenHelp: () => void;
+  onOpenReport: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -37,10 +38,31 @@ const Sidebar: React.FC<SidebarProps> = ({
   unreadMessages,
   pendingTasksCount,
   onOpenTaskCreator,
-  onOpenHelp
+  onOpenHelp,
+  onOpenReport
 }) => {
   
   const isAdmin = isUserAdmin(currentUser);
+  
+  // Touch Handling for Mobile Swipe
+  const touchStartX = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+      touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+      if (touchStartX.current === null) return;
+      const touchEndX = e.changedTouches[0].clientX;
+      const diff = touchStartX.current - touchEndX;
+
+      // If swipe left is significant (> 75px)
+      if (diff > 75) {
+          setIsOpen(false);
+      }
+      touchStartX.current = null;
+  };
+
 
   // Filter leads based on view scope
   const scopedLeads = savedLeads.filter(l => {
@@ -59,26 +81,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   const teamMembers: User[] = getUserNames();
 
   return (
-    <aside className={`
+    <aside 
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className={`
       w-72 h-screen fixed top-0 border-r border-white/5 p-4 z-[60] flex flex-col transition-transform duration-300 ease-in-out bg-[#050505]/95 backdrop-blur-xl lg:bg-[#050505]/80
       ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
     `}>
-      <div className="mb-8 px-2 pt-2 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          {/* Sidebar Logo */}
-          <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0 border border-white/5 shadow-lg shadow-black/50">
-             <PompinoLogo className="w-6 h-6 text-white" />
-          </div>
-          
-          <div className="min-w-0">
-            <h1 className="text-base font-black tracking-tight text-white uppercase italic leading-none">{PROJECT_CONFIG.appName}</h1>
-            <p className="text-[9px] font-bold text-indigo-400 tracking-widest uppercase mt-0.5">{PROJECT_CONFIG.appSubtitle}</p>
-          </div>
+      <div className="mb-8 pt-4 px-2 flex justify-between items-center">
+        {/* Full Integrated Logo in Sidebar */}
+        <div className="w-full flex justify-center">
+             <PompinoLogo className="w-48 h-24 text-white opacity-90" />
         </div>
         
         <button 
           onClick={() => setIsOpen(false)}
-          className="lg:hidden p-2 text-white/40 hover:text-white transition-colors"
+          className="lg:hidden absolute top-4 right-4 p-2 text-white/40 hover:text-white transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
@@ -92,11 +110,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => setActiveTab('intelligence')}
           className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mb-1 ${
             activeTab === 'intelligence' 
-              ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-white shadow-lg shadow-indigo-900/20 ring-1 ring-inset ring-white/10' 
+              ? 'bg-gradient-to-r from-rose-900/40 to-rose-800/20 text-white shadow-lg shadow-rose-900/20 ring-1 ring-inset ring-rose-500/30' 
               : 'text-white/50 hover:text-white hover:bg-white/5'
           }`}
         >
-          {activeTab === 'intelligence' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full shadow-[0_0_10px_#6366f1]"></div>}
+          {activeTab === 'intelligence' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-rose-500 rounded-r-full shadow-[0_0_10px_#e11d48]"></div>}
           <span className="text-lg opacity-80">🔭</span>
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-xs uppercase tracking-wide">Buscar Oportunidades</span>
@@ -110,11 +128,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setActiveTab('crm')}
             className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center justify-between gap-3 ${
               activeTab === 'crm' 
-                 ? 'bg-gradient-to-r from-emerald-500/10 to-teal-500/10 text-white shadow-lg shadow-emerald-900/20 ring-1 ring-inset ring-white/10' 
+                 ? 'bg-gradient-to-r from-amber-900/40 to-amber-800/20 text-white shadow-lg shadow-amber-900/20 ring-1 ring-inset ring-amber-500/30' 
                  : 'text-white/50 hover:text-white hover:bg-white/5'
             }`}
           >
-            {activeTab === 'crm' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-emerald-500 rounded-r-full shadow-[0_0_10px_#10b981]"></div>}
+            {activeTab === 'crm' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-amber-500 rounded-r-full shadow-[0_0_10px_#f59e0b]"></div>}
             <div className="flex items-center gap-3">
                 <span className="text-lg opacity-80">🗃️</span>
                 <div className="flex flex-col min-w-0">
@@ -123,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             </div>
             {activeTab === 'crm' && (
-                <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300">
                     {scopedLeads.length}
                 </span>
             )}
@@ -152,7 +170,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <button 
                         onClick={() => setViewScope('me')} 
                         className={`w-full text-left px-3 py-2 mb-1 rounded-lg text-[10px] uppercase font-bold transition-all flex items-center justify-between gap-2 ${
-                            viewScope === 'me' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-white/40 hover:text-white'
+                            viewScope === 'me' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'text-white/40 hover:text-white'
                         }`}
                       >
                           <span className="flex items-center gap-2">⭐ Pool General</span>
@@ -207,7 +225,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => setActiveTab('chat')}
           className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center justify-between gap-3 mt-1 ${
             activeTab === 'chat' 
-               ? 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 text-white shadow-lg shadow-blue-900/20 ring-1 ring-inset ring-white/10' 
+               ? 'bg-gradient-to-r from-blue-900/40 to-blue-800/20 text-white shadow-lg shadow-blue-900/20 ring-1 ring-inset ring-blue-500/30' 
                : 'text-white/50 hover:text-white hover:bg-white/5'
           }`}
         >
@@ -220,7 +238,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
           </div>
           {unreadMessages > 0 && activeTab !== 'chat' && (
-              <span className="flex items-center justify-center w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white shadow-[0_0_8px_#ef4444] animate-bounce">
+              <span className="flex items-center justify-center w-5 h-5 bg-rose-600 rounded-full text-[10px] font-bold text-white shadow-[0_0_8px_#e11d48] animate-bounce">
                   {unreadMessages}
               </span>
           )}
@@ -232,7 +250,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setActiveTab('stats')}
             className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mt-1 ${
                 activeTab === 'stats' 
-                ? 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 text-white shadow-lg shadow-yellow-900/20 ring-1 ring-inset ring-white/10' 
+                ? 'bg-gradient-to-r from-yellow-900/40 to-yellow-800/20 text-white shadow-lg shadow-yellow-900/20 ring-1 ring-inset ring-yellow-500/30' 
                 : 'text-white/50 hover:text-white hover:bg-white/5'
             }`}
             >
@@ -240,7 +258,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-lg opacity-80">📊</span>
             <div className="flex flex-col min-w-0">
                 <span className="font-bold text-xs uppercase tracking-wide">Stats & KPIs</span>
-                <span className="text-[9px] font-medium opacity-50 text-indigo-400">Admin Only</span>
+                <span className="text-[9px] font-medium opacity-50 text-amber-400">Admin Only</span>
             </div>
             </button>
         )}
@@ -250,11 +268,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => setActiveTab('agenda')}
           className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center justify-between gap-3 mt-1 ${
             activeTab === 'agenda' 
-               ? 'bg-gradient-to-r from-pink-500/10 to-rose-500/10 text-white shadow-lg shadow-pink-900/20 ring-1 ring-inset ring-white/10' 
+               ? 'bg-gradient-to-r from-purple-900/40 to-purple-800/20 text-white shadow-lg shadow-purple-900/20 ring-1 ring-inset ring-purple-500/30' 
                : 'text-white/50 hover:text-white hover:bg-white/5'
           }`}
         >
-          {activeTab === 'agenda' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-pink-500 rounded-r-full shadow-[0_0_10px_#ec4899]"></div>}
+          {activeTab === 'agenda' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-purple-500 rounded-r-full shadow-[0_0_10px_#a855f7]"></div>}
           <div className="flex items-center gap-3">
               <span className="text-lg opacity-80">📅</span>
               <div className="flex flex-col min-w-0">
@@ -263,7 +281,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
           </div>
           {pendingTasksCount > 0 && (
-              <span className="flex items-center justify-center w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white shadow-[0_0_8px_#ef4444] animate-pulse">
+              <span className="flex items-center justify-center w-5 h-5 bg-rose-600 rounded-full text-[10px] font-bold text-white shadow-[0_0_8px_#e11d48] animate-pulse">
                   {pendingTasksCount}
               </span>
           )}
@@ -275,7 +293,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setActiveTab('operations')}
             className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mt-1 ${
                 activeTab === 'operations' 
-                ? 'bg-gradient-to-r from-orange-500/10 to-red-500/10 text-white shadow-lg shadow-orange-900/20 ring-1 ring-inset ring-white/10' 
+                ? 'bg-gradient-to-r from-orange-900/40 to-orange-800/20 text-white shadow-lg shadow-orange-900/20 ring-1 ring-inset ring-orange-500/30' 
                 : 'text-white/50 hover:text-white hover:bg-white/5'
             }`}
             >
@@ -283,15 +301,24 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-lg opacity-80">⚡</span>
             <div className="flex flex-col min-w-0">
                 <span className="font-bold text-xs uppercase tracking-wide">Operaciones</span>
-                <span className="text-[9px] font-medium opacity-50 text-indigo-400">Admin Only</span>
+                <span className="text-[9px] font-medium opacity-50 text-orange-400">Admin Only</span>
             </div>
             </button>
         )}
 
       </nav>
 
-      {/* Cloud Status */}
-      <div className="px-4 pb-2">
+      {/* Cloud Status & Report */}
+      <div className="px-4 pb-2 space-y-2">
+          {/* Report Button */}
+          <button 
+             onClick={onOpenReport}
+             className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-white/5 hover:bg-rose-500/10 hover:text-rose-400 border border-transparent hover:border-rose-500/20 transition-all group"
+          >
+             <span className="text-sm opacity-50 group-hover:opacity-100">🐞</span>
+             <span className="text-[9px] font-bold uppercase text-white/40 group-hover:text-rose-400">Reportar Problema</span>
+          </button>
+
           <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg">
               <span className="text-lg animate-pulse">☁️</span>
               <div>
@@ -311,7 +338,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                  <p className="text-[10px] font-black text-white uppercase tracking-wide">{currentUser}</p>
                  {isAdmin && <span className="bg-white/20 text-[8px] font-bold px-1 rounded uppercase">ADMIN</span>}
              </div>
-             <button onClick={onLogout} className="text-[9px] text-red-400 hover:text-red-300 transition-colors font-medium">Cerrar Sesión</button>
+             <button onClick={onLogout} className="text-[9px] text-rose-400 hover:text-rose-300 transition-colors font-medium">Cerrar Sesión</button>
           </div>
         </div>
       </div>

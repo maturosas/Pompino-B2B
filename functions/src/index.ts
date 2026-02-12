@@ -1,6 +1,7 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { BigQuery } from "@google-cloud/bigquery";
+import * as nodemailer from "nodemailer";
 
 // Ensure Admin SDK is initialized
 if (!admin.apps.length) {
@@ -9,9 +10,8 @@ if (!admin.apps.length) {
 
 // Project Configuration Reference
 // Project ID: pompino-b2b
-// Project Number: 978737789416 (Useful for IAM / Service Account debugging)
 
-// Lazy initialization of BigQuery to prevent cold start crashes
+// Lazy initialization of BigQuery
 let bigqueryInstance: BigQuery | null = null;
 const getBigQuery = () => {
     if (!bigqueryInstance) {
@@ -20,7 +20,58 @@ const getBigQuery = () => {
     return bigqueryInstance;
 };
 
-// --- HELPERS (Safe Serialization & Error Handling) ---
+// --- EMAIL CONFIGURATION ---
+// ⚠️ IMPORTANT: Configure these variables in Firebase:
+// firebase functions:config:set email.user="tu_email@gmail.com" email.pass="tu_contraseña_de_aplicacion"
+const gmailEmail = functions.config().email?.user || "tu_sistema@gmail.com"; 
+const gmailPassword = functions.config().email?.pass || "password_temporal";
+
+const mailTransport = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: gmailEmail,
+    pass: gmailPassword,
+  },
+});
+
+// --- TRIGGER: SEND EMAIL ON REPORT ---
+export const sendReportEmail = functions.firestore
+    .document('reports/{reportId}')
+    .onCreate(async (snap, context) => {
+      const report = snap.data();
+      
+      const mailOptions = {
+        from: `"Pompino System" <${gmailEmail}>`,
+        to: "hola@bzsgrupobebidas.com.ar",
+        subject: `🐞 Nuevo Reporte de Problema - ${report.user}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #d12030;">Nuevo Reporte en Pompino</h2>
+            <p><strong>Usuario:</strong> ${report.user}</p>
+            <p><strong>Fecha:</strong> ${new Date(report.timestamp).toLocaleString()}</p>
+            <hr />
+            <p style="background: #f5f5f5; padding: 15px; border-left: 4px solid #d12030;">
+              ${report.message}
+            </p>
+            <hr />
+            <p style="font-size: 12px; color: #888;">Este es un mensaje automático del sistema BZS.</p>
+          </div>
+        `
+      };
+
+      try {
+        await mailTransport.sendMail(mailOptions);
+        console.log('Email de reporte enviado correctamente');
+        // Actualizar estado en DB
+        await snap.ref.update({ status: 'email_sent' });
+      } catch (error) {
+        console.error('Error enviando email:', error);
+        await snap.ref.update({ status: 'email_failed', error: String(error) });
+      }
+});
+
+
+// --- BIGQUERY ANALYTICS FUNCTIONS (EXISTING) ---
 
 const safeStringify = (obj: any) => {
     const cache = new Set();
@@ -59,11 +110,8 @@ const normalizeError = (err: any) => {
     };
 };
 
-// --- DATE LOGIC FOR BIGQUERY TABLES ---
-
 const getTableSuffix = (filter: string, customStart?: string, customEnd?: string) => {
     const now = new Date();
-    // BigQuery suffix format: YYYYMMDD
     const toBQFormat = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
     
     let start = new Date();
@@ -77,48 +125,37 @@ const getTableSuffix = (filter: string, customStart?: string, customEnd?: string
     } else if (filter === '30d') {
         start.setDate(now.getDate() - 30);
     } else if (filter === 'custom' && customStart && customEnd) {
-        // Assume input is YYYY-MM-DD
         return { start: customStart.replace(/-/g, ''), end: customEnd.replace(/-/g, '') };
     }
-    // 'today' is default (start=now, end=now)
     
     return { start: toBQFormat(start), end: toBQFormat(end) };
 };
 
 export const getGa4Reports = functions.https.onCall(async (data: any, context: any) => {
-  console.log("📡 [START] getGa4Reports (Safe Mode)");
-
-  // 1. Safe Project ID Detection
   let projectId = 'pompino-b2b';
   try {
      projectId = process.env.GCLOUD_PROJECT || 
                  (admin.app().options.projectId) || 
                  (process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : 'pompino-b2b');
   } catch (e) {
-     console.warn("⚠️ Could not detect Project ID automatically, using default.", e);
+     console.warn("Using default project ID");
   }
 
   try {
-      // 2. Input Validation
       let { propertyId, dateFilter = '30d', customStart, customEnd, reportType = 'summary' } = data || {};
       
       if (!propertyId) propertyId = '375682540';
-      propertyId = propertyId.replace(/^p/, ''); // Remove 'p' prefix if present
+      propertyId = propertyId.replace(/^p/, '');
 
       const datasetId = `analytics_${propertyId}`;
       const { start, end } = getTableSuffix(dateFilter, customStart, customEnd);
       
-      // Construct table reference with wildcard for date range
-      // Important: Use backticks for BigQuery table/project names to handle hyphens
       const tableRef = `\`${projectId}.${datasetId}.events_*\``;
       const whereClause = `_TABLE_SUFFIX BETWEEN '${start}' AND '${end}'`;
-
-      console.log(`⚙️ Querying BigQuery: ${tableRef} for range ${start}-${end}`);
 
       const bigquery = getBigQuery();
 
       if (reportType === 'summary') {
-          // KPI Query
           const kpiQuery = `
             SELECT
                 COUNT(DISTINCT user_pseudo_id) as users,
@@ -130,7 +167,6 @@ export const getGa4Reports = functions.https.onCall(async (data: any, context: a
             WHERE ${whereClause}
           `;
 
-          // Product Query
           const productQuery = `
              SELECT
                 item_name as name,
@@ -159,7 +195,6 @@ export const getGa4Reports = functions.https.onCall(async (data: any, context: a
           });
 
       } else if (reportType === 'panoramic') {
-          // Sources
           const sourceQuery = `
             SELECT 
                 (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') as name,
@@ -171,7 +206,6 @@ export const getGa4Reports = functions.https.onCall(async (data: any, context: a
             LIMIT 10
           `;
 
-          // Cities
           const cityQuery = `
             SELECT geo.city as name, COUNT(DISTINCT user_pseudo_id) as value
             FROM ${tableRef}
@@ -181,7 +215,6 @@ export const getGa4Reports = functions.https.onCall(async (data: any, context: a
             LIMIT 10
           `;
 
-          // Devices
           const deviceQuery = `
              SELECT device.category as name, 
              COUNT(DISTINCT CONCAT(user_pseudo_id, (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id'))) as value
@@ -210,35 +243,15 @@ export const getGa4Reports = functions.https.onCall(async (data: any, context: a
       return cleanPayload({ error: true, message: "Invalid report type" });
 
   } catch (err: any) {
-      console.error("❌ BigQuery Error:", err);
       const normalized = normalizeError(err);
-
-      // Handle "Not Found" specifically (Table not found implies no data for date range)
-      // BigQuery 404 looks like code: 404 or message contains "Not found"
       if (normalized.code === 404 || (normalized.message && normalized.message.includes("Not found"))) {
            return cleanPayload({
               error: true, 
               message: "Datos no disponibles", 
-              userHint: "BigQuery no encontró tablas para este rango de fechas. Si acabas de vincular GA4, espera 24-48hs.",
+              userHint: "BigQuery no encontró tablas para este rango de fechas.",
               originalError: normalized.message
            });
       }
-      
-      // Check for permission denied
-      if (normalized.code === 403 || (normalized.message && normalized.message.includes("Permission denied"))) {
-            return cleanPayload({
-              error: true,
-              fatal: true,
-              message: "Permiso denegado en BigQuery",
-              userHint: `La cuenta de servicio del proyecto ${projectId} (o ${process.env.GCLOUD_PROJECT}) no tiene acceso al dataset. Ve a IAM y dale rol 'BigQuery Data Viewer'.`,
-              details: normalized.details
-          });
-      }
-
-      return cleanPayload({
-          error: true,
-          fatal: true,
-          ...normalized
-      });
+      return cleanPayload({ error: true, fatal: true, ...normalized });
   }
 });

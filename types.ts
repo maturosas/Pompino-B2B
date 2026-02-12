@@ -21,12 +21,15 @@ export interface Lead {
   };
   
   // Gestión de Tiempos y Acciones
-  lastContactDate?: string; // Fecha de contacto (Automática)
+  lastContactDate?: string; // Fecha de contacto (Automática) - Se usa como FECHA DE CIERRE si status es client
   
   nextAction?: 'call' | 'whatsapp' | 'email' | 'visit' | 'quote' | 'offer' | 'sale'; // Próxima Acción
   nextActionDate?: string; // Fecha Próxima Acción
   
   priceList?: 'special' | 'wholesale' | 'discount_15' | 'regular'; // Lista de Precios
+  
+  // Venta y Bono
+  saleValue?: number; // Valor de la primera venta en ARS
   
   // Campos Ficha Técnica (Legacy/Optional)
   decisionMaker?: string;

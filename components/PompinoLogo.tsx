@@ -1,41 +1,122 @@
 
 import React from 'react';
 
-export const PompinoLogo: React.FC<{ className?: string }> = ({ className }) => {
+interface PompinoLogoProps {
+  className?: string;
+  variant?: 'full' | 'icon';
+}
+
+export const PompinoLogo: React.FC<PompinoLogoProps> = ({ className, variant = 'full' }) => {
+  
+  // Shared Owl Path Elements (Using currentColor for flexibility)
+  const OwlContent = () => (
+      <g>
+        {/* Top Hat */}
+        <path d="M 55 50 L 145 50 L 145 5 L 55 5 Z" fill="currentColor" />
+        <rect x="55" y="35" width="90" height="15" fill="#111" /> {/* Band */}
+        <path d="M 35 50 L 165 50 L 165 58 Q 165 62 161 62 L 39 62 Q 35 62 35 58 Z" fill="currentColor" /> {/* Brim */}
+
+        {/* Head Shape */}
+        <path 
+          d="M 30 70 
+             Q 10 60 10 90 
+             Q 10 150 100 185 
+             Q 190 150 190 90 
+             Q 190 60 170 70 
+             L 100 90 
+             L 30 70 Z" 
+          fill="currentColor" 
+        />
+        
+        {/* Eyes (Black Background) */}
+        <circle cx="65" cy="115" r="28" fill="#050505" />
+        <circle cx="135" cy="115" r="28" fill="#050505" />
+
+        {/* Pupils (White -> currentColor) */}
+        <circle cx="65" cy="115" r="8" fill="currentColor" />
+        <circle cx="135" cy="115" r="8" fill="currentColor" />
+        
+        {/* Eye Glint (Life) */}
+        <circle cx="68" cy="112" r="2" fill="#050505" />
+        <circle cx="138" cy="112" r="2" fill="#050505" />
+
+        {/* Beak */}
+        <path d="M 100 150 L 88 135 L 112 135 Z" fill="currentColor" />
+
+        {/* Monocle (Viewer's Left) */}
+        <circle cx="65" cy="115" r="32" stroke="currentColor" strokeWidth="2.5" fill="none" />
+        {/* Monocle String */}
+        <path d="M 33 115 Q 20 150 40 180" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.8" />
+      </g>
+  );
+
+  if (variant === 'icon') {
+      return (
+        <svg 
+            viewBox="0 0 200 200" 
+            fill="none" 
+            className={className} 
+            xmlns="http://www.w3.org/2000/svg"
+        >
+            <OwlContent />
+        </svg>
+      );
+  }
+
   return (
     <svg 
-      viewBox="0 0 512 512" 
-      fill="currentColor" 
+      viewBox="0 0 400 400" 
+      fill="none" 
       className={className} 
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Top Hat */}
-      <path d="M150 140 L362 140 L350 40 L162 40 Z" fill="currentColor"/>
-      <rect x="120" y="140" width="272" height="40" rx="8" fill="currentColor"/>
-      
-      {/* Owl Head Shape */}
-      <path d="M110 180 C110 180 90 250 110 350 C130 440 256 500 256 500 C256 500 382 440 402 350 C422 250 402 180 402 180 L256 210 L110 180 Z" fill="currentColor"/>
-      
-      {/* Eyes Container (Cutout simulation) */}
-      <g fill="#050505">
-         <circle cx="190" cy="290" r="55"/>
-         <circle cx="322" cy="290" r="55"/>
+      {/* 
+         DESIGN STRATEGY:
+         - Vertical Stack: Owl Icon -> Main Title -> Subtitles
+         - Centered at x=200
+         - High contrast (White on Dark) for max legibility
+      */}
+
+      {/* --- OWL ICON (GENTLEMAN) --- */}
+      <g transform="translate(105, 30) scale(0.95)">
+        <OwlContent />
       </g>
+
+      {/* --- TITLE: POMP [GLASS] NO --- */}
+      {/* Centered vertically around y=280 to leave space for the Owl above */}
       
-      {/* Eye Pupils */}
-      <circle cx="190" cy="290" r="25" fill="currentColor"/>
-      <circle cx="322" cy="290" r="25" fill="currentColor"/>
+      <text x="192" y="280" textAnchor="end" fontFamily="sans-serif" fontWeight="900" fontSize="48" letterSpacing="3" fill="currentColor">
+        POMP
+      </text>
+
+      {/* Wine Glass Icon (Replacing the 'I') */}
+      <g transform="translate(196, 245)">
+          {/* Bowl */}
+          <path d="M 0 0 Q 0 25 10 25 Q 20 25 20 0" fill="none" stroke="currentColor" strokeWidth="3" />
+          {/* Liquid Level */}
+          <path d="M 2 8 Q 10 12 18 8 L 18 0 L 2 0 Z" fill="currentColor" opacity="0.8" />
+          {/* Stem */}
+          <line x1="10" y1="25" x2="10" y2="42" stroke="currentColor" strokeWidth="3" />
+          {/* Base */}
+          <line x1="2" y1="42" x2="18" y2="42" stroke="currentColor" strokeWidth="3" />
+      </g>
+
+      <text x="222" y="280" textAnchor="start" fontFamily="sans-serif" fontWeight="900" fontSize="48" letterSpacing="3" fill="currentColor">
+        NO
+      </text>
+
+      {/* --- SUBTITLES --- */}
       
-      {/* Monocle Frame & String */}
-      <circle cx="190" cy="290" r="62" stroke="currentColor" strokeWidth="8" fill="none"/>
-      <path d="M135 260 C120 350 160 500 160 500" stroke="currentColor" strokeWidth="0" fill="none"/> 
-      <path d="M245 290 C245 290 260 400 260 450" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.5"/>
-      
-      {/* Beak */}
-      <path d="M240 360 L272 360 L256 410 Z" fill="#050505"/>
-      
-      {/* Feathers / Details */}
-      <path d="M256 190 L256 220" stroke="#050505" strokeWidth="4"/>
+      {/* Increased Size for BZS */}
+      <text x="200" y="325" textAnchor="middle" fontFamily="sans-serif" fontWeight="900" fontSize="22" letterSpacing="2" fill="currentColor" opacity="0.9">
+        BZS GRUPO BEBIDAS
+      </text>
+
+      {/* Increased Size for Signature */}
+      <text x="200" y="350" textAnchor="middle" fontFamily="monospace" fontWeight="500" fontSize="14" letterSpacing="2" fill="currentColor" opacity="0.6">
+        by Mati Rosas
+      </text>
+
     </svg>
   );
 };

@@ -49,7 +49,7 @@ const AgendaView: React.FC<AgendaViewProps> = ({ tasks, directTasks, user, onUpd
         
         {/* Header */}
         <div className="glass-solid p-6 rounded-3xl border border-white/10 relative overflow-hidden">
-             <div className="absolute top-0 right-0 w-64 h-64 bg-pink-500/10 blur-[80px] rounded-full pointer-events-none"></div>
+             {/* REMOVED PINK BLUR */}
              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                  <div>
                     <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">

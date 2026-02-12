@@ -41,6 +41,10 @@ const CRMView: React.FC<CRMViewProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   
+  // Close Sale Modal State
+  const [leadToClose, setLeadToClose] = useState<string | null>(null);
+  const [closingSaleAmount, setClosingSaleAmount] = useState('');
+
   // Import State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -164,6 +168,35 @@ const CRMView: React.FC<CRMViewProps> = ({
     window.open(TEMPLATE_URL, '_blank');
   };
 
+  // Special handler for status change in dropdown
+  const handleStatusChange = (id: string, newStatus: string) => {
+      if (newStatus === 'client') {
+          setLeadToClose(id);
+          setClosingSaleAmount('');
+      } else {
+          onUpdateLead(id, { status: newStatus as any });
+      }
+  };
+
+  const confirmCloseSale = () => {
+      if (!leadToClose) return;
+      const value = parseFloat(closingSaleAmount);
+      if (isNaN(value) || value <= 0) {
+          alert("Ingresa un monto válido");
+          return;
+      }
+      
+      onDetailedUpdate(leadToClose, {
+          status: 'client',
+          isClient: true,
+          nextAction: 'sale',
+          saleValue: value
+      }, `Cierre Venta: $${value}`);
+      
+      setLeadToClose(null);
+      setClosingSaleAmount('');
+  };
+
   const handleProcessImport = async () => {
     if (!importFile) return;
 
@@ -243,6 +276,7 @@ const CRMView: React.FC<CRMViewProps> = ({
         "Proxima Acción", 
         "Fecha Proxima", 
         "Lista Precios", 
+        "Venta 1 (ARS)",
         "Notas"
     ];
     
@@ -263,6 +297,7 @@ const CRMView: React.FC<CRMViewProps> = ({
         escape(l.nextAction), 
         escape(l.nextActionDate), 
         escape(l.priceList), 
+        escape(l.saleValue || 0),
         escape(l.notes)
       ].join(","))
     ].join("\n");
@@ -459,7 +494,7 @@ const CRMView: React.FC<CRMViewProps> = ({
                         )}
                         <select 
                             value={lead.status} 
-                            onChange={(e) => { e.stopPropagation(); onUpdateLead(lead.id, { status: e.target.value as any }); }}
+                            onChange={(e) => { e.stopPropagation(); handleStatusChange(lead.id, e.target.value); }}
                             className={`text-[9px] font-bold uppercase rounded px-2 py-1 border outline-none ${getStatusStyles(lead.status)}`}
                         >
                              <option value="frio">FRIO</option>
@@ -572,7 +607,7 @@ const CRMView: React.FC<CRMViewProps> = ({
 
                     {/* Status */}
                     <td className="px-6 py-3 align-middle">
-                        <select value={lead.status} onChange={(e) => onUpdateLead(lead.id, { status: e.target.value as any })} className={`border rounded-lg px-2 py-0 text-[9px] font-bold uppercase h-7 w-full outline-none ${getStatusStyles(lead.status)}`}>
+                        <select value={lead.status} onChange={(e) => handleStatusChange(lead.id, e.target.value)} className={`border rounded-lg px-2 py-0 text-[9px] font-bold uppercase h-7 w-full outline-none ${getStatusStyles(lead.status)}`}>
                           <option value="frio">FRIO</option>
                           <option value="contacted">CONTACTADO</option>
                           <option value="negotiation">EN PROCESO</option>
@@ -645,6 +680,43 @@ const CRMView: React.FC<CRMViewProps> = ({
         </div>
       </div>
       
+      {/* Modal for Closing Sale */}
+      {leadToClose && (
+           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+             <div className="bg-[#111] border border-emerald-500/30 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative">
+                  <h3 className="text-xl font-black text-emerald-400 uppercase italic mb-4">¡Cierre de Venta! 🚀</h3>
+                  <div className="space-y-4">
+                      <div>
+                          <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Importe 1ra Venta (ARS)</label>
+                          <input 
+                              autoFocus
+                              type="number"
+                              value={closingSaleAmount}
+                              onChange={(e) => setClosingSaleAmount(e.target.value)}
+                              placeholder="$ 0.00"
+                              className="w-full h-14 bg-emerald-900/20 border border-emerald-500/50 rounded-xl px-4 text-white text-xl font-black outline-none focus:border-emerald-400"
+                          />
+                          <p className="text-[9px] text-white/40 mt-1.5">Escribir únicamente el valor de la primer venta</p>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                          <button 
+                              onClick={() => { setLeadToClose(null); setClosingSaleAmount(''); }} 
+                              className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white uppercase"
+                          >
+                              Cancelar
+                          </button>
+                          <button 
+                              onClick={confirmCloseSale}
+                              className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase shadow-lg"
+                          >
+                              Confirmar
+                          </button>
+                      </div>
+                  </div>
+             </div>
+           </div>
+      )}
+
       {selectedLead && (
         <LeadDetailPanel 
             lead={selectedLead} 
@@ -724,10 +796,9 @@ const CRMView: React.FC<CRMViewProps> = ({
                             onChange={(e) => setImportTargetUser(e.target.value as User)}
                             className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-indigo-500"
                         >
-                            <option value="Mati">Mati</option>
-                            <option value="Diego">Diego</option>
-                            <option value="Gaston">Gaston</option>
-                            <option value="TESTER">TESTER</option>
+                            {userList.map(u => (
+                                <option key={u} value={u} className="text-black">{u}</option>
+                            ))}
                         </select>
                      </div>
 

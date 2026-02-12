@@ -173,6 +173,12 @@ export const IntelligenceTool: React.FC<IntelligenceToolProps> = ({ leads, onUpd
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + ' ' + location)}`;
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isSearching && zone && type) {
+        runPipeline();
+    }
+  };
+
   // Helper to check ownership
   const getLeadStatus = (lead: Lead) => {
       const existing = allSavedLeads.find(l => l.name === lead.name || l.id === lead.id);
@@ -188,7 +194,7 @@ export const IntelligenceTool: React.FC<IntelligenceToolProps> = ({ leads, onUpd
       {/* Search Command Center */}
       <div className="p-1 rounded-3xl bg-gradient-to-b from-white/10 to-transparent shadow-2xl">
           <div className="glass-solid rounded-[22px] p-4 md:p-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[80px] rounded-full pointer-events-none"></div>
+             {/* REMOVED BLUE GLOW */}
             
             <div className="flex justify-between items-center mb-6 relative z-10">
                 <div className="flex flex-col gap-1">
@@ -219,7 +225,14 @@ export const IntelligenceTool: React.FC<IntelligenceToolProps> = ({ leads, onUpd
                 <div className="lg:col-span-5 group">
                     <label className="text-[10px] font-bold text-indigo-300/80 uppercase tracking-widest mb-1.5 block ml-1 group-focus-within:text-indigo-400 transition-colors">Zona Geográfica</label>
                     <div className="relative">
-                        <input value={zone} onChange={(e) => setZone(e.target.value)} list="history-zones-list" placeholder="Ej: Palermo Hollywood, CABA" className="w-full h-14 bg-black/50 border border-white/10 hover:border-white/20 focus:border-indigo-500/50 rounded-2xl px-5 text-sm font-medium text-white placeholder:text-white/20 outline-none transition-all shadow-inner focus:shadow-[0_0_20px_rgba(99,102,241,0.1)]" />
+                        <input 
+                            value={zone} 
+                            onChange={(e) => setZone(e.target.value)} 
+                            onKeyDown={handleKeyDown}
+                            list="history-zones-list" 
+                            placeholder="Ej: Palermo Hollywood, CABA" 
+                            className="w-full h-14 bg-black/50 border border-white/10 hover:border-white/20 focus:border-indigo-500/50 rounded-2xl px-5 text-sm font-medium text-white placeholder:text-white/20 outline-none transition-all shadow-inner focus:shadow-[0_0_20px_rgba(99,102,241,0.1)]" 
+                        />
                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">📍</div>
                     </div>
                     <datalist id="history-zones-list">
@@ -229,7 +242,14 @@ export const IntelligenceTool: React.FC<IntelligenceToolProps> = ({ leads, onUpd
                 <div className="lg:col-span-5 group">
                     <label className="text-[10px] font-bold text-indigo-300/80 uppercase tracking-widest mb-1.5 block ml-1 group-focus-within:text-indigo-400 transition-colors">Rubro o Nombre del Negocio</label>
                     <div className="relative">
-                        <input value={type} onChange={(e) => setType(e.target.value)} list="history-types-list" placeholder="Ej: BZS, Vinotecas, Bares, El Club de la Milanesa" className="w-full h-14 bg-black/50 border border-white/10 hover:border-white/20 focus:border-indigo-500/50 rounded-2xl px-5 text-sm font-medium text-white placeholder:text-white/20 outline-none transition-all shadow-inner focus:shadow-[0_0_20px_rgba(99,102,241,0.1)]" />
+                        <input 
+                            value={type} 
+                            onChange={(e) => setType(e.target.value)} 
+                            onKeyDown={handleKeyDown}
+                            list="history-types-list" 
+                            placeholder="Ej: BZS, Vinotecas, Bares, El Club de la Milanesa" 
+                            className="w-full h-14 bg-black/50 border border-white/10 hover:border-white/20 focus:border-indigo-500/50 rounded-2xl px-5 text-sm font-medium text-white placeholder:text-white/20 outline-none transition-all shadow-inner focus:shadow-[0_0_20px_rgba(99,102,241,0.1)]" 
+                        />
                         <div className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none">🏢</div>
                     </div>
                     <datalist id="history-types-list">

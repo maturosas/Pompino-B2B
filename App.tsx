@@ -10,6 +10,7 @@ import TeamChat from './components/TeamChat';
 import { PompinoLogo } from './components/PompinoLogo';
 import { Lead, User, OperationLog, TransferRequest, ChatMessage, DirectTask, ChatChannel } from './types';
 import HowToUseModal from './components/HowToUseModal';
+import ReportIssueModal from './components/ReportIssueModal'; // New Import
 import ActionCenter from './components/ActionCenter'; // Non-invasive notifications
 import { PROJECT_CONFIG, getCredentials, getUserNames, isUserAdmin } from './projectConfig';
 
@@ -29,8 +30,9 @@ const App: React.FC = () => {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
-  // Unified Help State
+  // Modal States
   const [showHelp, setShowHelp] = useState(false);
+  const [showReport, setShowReport] = useState(false); // New Report State
   
   // Action Center State (Non-invasive Agenda)
   const [showActionCenter, setShowActionCenter] = useState(false);
@@ -509,19 +511,15 @@ const App: React.FC = () => {
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4 font-sans relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-40"></div>
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-indigo-900/20 blur-[120px] rounded-full pointer-events-none"></div>
+        <HowToUseModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+        <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
+        {/* Removed glass-panel class and unnecessary shadows */}
 
-        <div className="max-w-md w-full glass-panel rounded-3xl p-8 md:p-12 shadow-2xl text-center space-y-8 relative z-10 animate-in flex flex-col items-center">
+        <div className="max-w-md w-full rounded-3xl p-8 md:p-12 text-center space-y-8 relative z-10 animate-in flex flex-col items-center">
           
-          <div className="relative mb-4 group cursor-default">
-            <div className="absolute inset-0 bg-indigo-500/30 blur-2xl rounded-full group-hover:bg-indigo-500/40 transition-all duration-500"></div>
-            <PompinoLogo className="w-32 h-32 text-white relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />
-          </div>
-
-          <div className="space-y-1">
-            <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase drop-shadow-lg">{PROJECT_CONFIG.appName}</h1>
-            <p className="text-[11px] font-bold text-indigo-300 uppercase tracking-[0.3em] border-t border-white/10 pt-3 mt-3">{PROJECT_CONFIG.appSubtitle}</p>
+          <div className="relative mb-8 group cursor-default">
+            {/* Integrated Logo: Larger size, no glow/shadow effects */}
+            <PompinoLogo className="w-80 h-80 text-white relative z-10" />
           </div>
           
           {dbError && (
@@ -532,19 +530,30 @@ const App: React.FC = () => {
           )}
 
           <div className="w-full space-y-4 pt-4 animate-in fade-in slide-in-from-right duration-300">
-             <p className="text-white/50 text-xs font-medium tracking-wide mb-6">SELECCIONA TU PERFIL</p>
+             <p className="text-white/30 text-xs font-bold tracking-widest mb-6 uppercase">Selecciona tu perfil</p>
              <div className="grid gap-3 w-full">
                {userList.map((user) => (
                  <button
                    key={user}
                    onClick={() => handleSelectUser(user)}
-                   className="h-14 w-full border border-white/10 rounded-xl hover:bg-white hover:text-black hover:border-white transition-all duration-300 group relative overflow-hidden bg-black/40 backdrop-blur-sm"
+                   className="h-14 w-full border border-white/10 rounded-xl hover:bg-white hover:text-black hover:border-white transition-all duration-300 group relative overflow-hidden bg-white/5"
                  >
-                   <span className="relative z-10 text-sm font-black uppercase tracking-widest">{user}</span>
-                   <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                   <span className="relative z-10 text-sm font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                       {user}
+                       {isUserAdmin(user) && (
+                           <span className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded border border-white/10 text-white/60 group-hover:text-black/60 group-hover:border-black/10">ADMIN</span>
+                       )}
+                   </span>
                  </button>
                ))}
              </div>
+             
+             <button 
+                onClick={() => setShowHelp(true)}
+                className="text-[10px] text-white/20 hover:text-white font-bold uppercase tracking-widest mt-8 transition-colors"
+             >
+                 ¿Cómo funciona el sistema?
+             </button>
           </div>
         </div>
       </div>
@@ -575,13 +584,14 @@ const App: React.FC = () => {
         pendingTasksCount={0} // Managed by ActionCenter now
         onOpenTaskCreator={() => setShowTaskCreator(true)}
         onOpenHelp={() => setShowHelp(true)}
+        onOpenReport={() => setShowReport(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full relative z-0 transition-all duration-300 lg:pl-72">
         {/* WARNING BANNER */}
-        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 text-center animate-pulse">
-            <p className="text-yellow-400 text-[10px] md:text-xs font-black uppercase tracking-widest">
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center animate-pulse">
+            <p className="text-amber-400 text-[10px] md:text-xs font-black uppercase tracking-widest">
                 estas usando un usuario abierto - Carga cosas y gestiona operaciones tranquilo - pelotudazo!!
             </p>
         </div>
@@ -589,10 +599,9 @@ const App: React.FC = () => {
         {/* Mobile Header */}
         <div className="lg:hidden p-4 flex items-center justify-between border-b border-white/5 bg-[#050505]">
             <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
-                    <PompinoLogo className="w-5 h-5 text-white" />
+                <div className="w-24 h-12 flex items-center justify-center">
+                    <PompinoLogo variant="full" className="w-full h-full text-white" />
                 </div>
-                <span className="font-black italic uppercase text-white">{PROJECT_CONFIG.appName}</span>
             </div>
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-white">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -705,7 +714,7 @@ const App: React.FC = () => {
                                     key={u}
                                     type="button"
                                     onClick={() => setNewTaskTarget(u)}
-                                    className={`h-10 rounded-xl text-xs font-bold uppercase transition-all ${newTaskTarget === u ? 'bg-indigo-500 text-white shadow-lg' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                                    className={`h-10 rounded-xl text-xs font-bold uppercase transition-all ${newTaskTarget === u ? 'bg-rose-600 text-white shadow-lg' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
                                   >
                                       {u}
                                   </button>
@@ -718,18 +727,24 @@ const App: React.FC = () => {
                               value={newTaskMessage}
                               onChange={(e) => setNewTaskMessage(e.target.value)}
                               placeholder="Ej: Llamar urgente a..."
-                              className="w-full h-24 bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-indigo-500 outline-none resize-none"
+                              className="w-full h-24 bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-rose-500 outline-none resize-none"
                            />
                       </div>
                       <div className="flex justify-end gap-2 pt-2">
                           <button type="button" onClick={() => setShowTaskCreator(false)} className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white uppercase">Cancelar</button>
-                          <button type="submit" disabled={!newTaskTarget || !newTaskMessage} className="px-6 py-2 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white text-xs font-black uppercase rounded-xl transition-all shadow-lg">Enviar Tarea</button>
+                          <button type="submit" disabled={!newTaskTarget || !newTaskMessage} className="px-6 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-black uppercase rounded-xl transition-all shadow-lg">Enviar Tarea</button>
                       </div>
                   </form>
               </div>
           </div>
       )}
 
+      {/* MODALS */}
+      <ReportIssueModal 
+         isOpen={showReport} 
+         onClose={() => setShowReport(false)} 
+         currentUser={currentUser} 
+      />
       <HowToUseModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );

@@ -19,7 +19,7 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
       {/* Panel */}
-      <div className="relative w-full md:max-w-xl bg-black border-l border-white/10 h-full flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="relative w-full md:max-w-xl bg-black border-l border-white/10 h-[100dvh] flex flex-col animate-in slide-in-from-right duration-300">
         <header className="p-6 md:p-8 border-b border-white/10 flex justify-between items-center bg-[#050505]">
           <div className="min-w-0 pr-4">
             <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.4em] block">Ficha de Inteligencia B2B</span>
@@ -178,14 +178,29 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
           </section>
         </div>
 
-        <footer className="p-6 md:p-8 border-t border-white/10 bg-[#050505] flex gap-4">
-           <a 
-            href={`https://wa.me/${(lead.phone || '').replace(/\D/g, '')}`} 
-            target="_blank"
-            className="flex-1 h-14 bg-white text-black rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest hover:bg-white/90 active:scale-95 transition-all shadow-xl shadow-white/5"
-           >
-             Contactar por WhatsApp
-           </a>
+        <footer className="p-6 md:p-8 border-t border-white/10 bg-[#050505] flex flex-col md:flex-row gap-4">
+           {lead.phone && (
+               <a 
+                href={`https://wa.me/${(lead.phone || '').replace(/\D/g, '')}`} 
+                target="_blank"
+                className="flex-1 h-12 md:h-14 bg-white text-black rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest hover:bg-white/90 active:scale-95 transition-all shadow-xl shadow-white/5"
+               >
+                 Contactar por WhatsApp
+               </a>
+           )}
+           
+           {lead.status !== 'client' ? (
+               <button 
+                onClick={() => onUpdate({ status: 'client', isClient: true, nextAction: 'sale' }, 'Cierre Venta 🚀')}
+                className="flex-1 h-12 md:h-14 bg-emerald-500 text-white rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest hover:bg-emerald-400 active:scale-95 transition-all shadow-xl shadow-emerald-900/20"
+               >
+                 ¡Cerrar Venta! 🚀
+               </button>
+           ) : (
+                <div className="flex-1 h-12 md:h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center font-black uppercase text-xs tracking-widest text-emerald-400">
+                    Cliente Activo
+                </div>
+           )}
         </footer>
       </div>
     </div>

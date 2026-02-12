@@ -1,16 +1,19 @@
 
-import React from 'react';
-import { Lead, User } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Lead, User, DirectTask } from '../types';
 
 interface TaskReminderModalProps {
   isOpen: boolean;
   onClose: () => void;
   tasks: Lead[];
+  directTasks: DirectTask[];
   user: User;
+  onUpdateTask: (id: string, updates: Partial<Lead>) => void;
+  onCompleteDirectTask: (id: string) => void;
 }
 
-const TaskReminderModal: React.FC<TaskReminderModalProps> = ({ isOpen, onClose, tasks, user }) => {
-  if (!isOpen) return null;
+const TaskReminderModal: React.FC<TaskReminderModalProps> = ({ isOpen, onClose, tasks, directTasks, user, onUpdateTask, onCompleteDirectTask }) => {
+  const [viewMode, setViewMode] = useState<'today' | 'future'>('today');
 
   const actionLabels: Record<string, string> = {
     call: 'Llamado',
@@ -22,62 +25,153 @@ const TaskReminderModal: React.FC<TaskReminderModalProps> = ({ isOpen, onClose, 
     sale: 'Cierre Venta'
   };
 
-  const today = new Date().toLocaleDateString();
+  const today = new Date().toISOString().split('T')[0];
+
+  // Separar tareas
+  const { dueTasks, futureTasks } = useMemo(() => {
+    const due: Lead[] = [];
+    const future: Lead[] = [];
+    tasks.forEach(task => {
+        if (!task.nextActionDate) return;
+        if (task.nextActionDate <= today) due.push(task);
+        else future.push(task);
+    });
+    // Ordenar: Vencidas primero, Futuras por fecha
+    due.sort((a, b) => (a.nextActionDate || '') > (b.nextActionDate || '') ? 1 : -1);
+    future.sort((a, b) => (a.nextActionDate || '') > (b.nextActionDate || '') ? 1 : -1);
+    
+    return { dueTasks: due, futureTasks: future };
+  }, [tasks, today]);
+
+  if (!isOpen) return null;
+
+  const activeList = viewMode === 'today' ? dueTasks : futureTasks;
+  const hasTasksToday = dueTasks.length > 0;
+  const pendingDirectTasks = directTasks.filter(t => t.status === 'pending');
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-[#111] border border-indigo-500/30 rounded-3xl w-full max-w-lg p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-[#111] border border-white/10 rounded-3xl w-full max-w-lg p-6 shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300 max-h-[85vh] flex flex-col">
         
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-2xl shadow-[0_0_20px_#6366f1]">
-                📅
+        <div className="flex items-center gap-4 mb-6 shrink-0 border-b border-white/5 pb-4">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-colors ${hasTasksToday || pendingDirectTasks.length > 0 ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                {hasTasksToday || pendingDirectTasks.length > 0 ? '📅' : '✅'}
             </div>
-            <div>
-                <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">Agenda del Día</h2>
-                <p className="text-xs text-indigo-300 font-bold uppercase tracking-widest">{today} • Hola {user}</p>
+            <div className="flex-1">
+                <h2 className="text-xl font-black text-white uppercase italic tracking-tighter">
+                    Agenda Operativa
+                </h2>
+                <p className="text-xs text-white/50 font-bold uppercase tracking-widest">{new Date().toLocaleDateString()} • Hola {user}</p>
             </div>
         </div>
 
-        {/* Task List */}
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scroll pr-2">
-            <p className="text-sm text-white/70">Tienes <strong className="text-white">{tasks.length} tareas</strong> programadas para hoy:</p>
-            
-            {tasks.map(task => (
-                <div key={task.id} className="bg-white/5 border border-white/10 p-3 rounded-xl flex justify-between items-center group hover:bg-white/10 transition-colors">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded uppercase">
-                                {actionLabels[task.nextAction || 'call']}
-                            </span>
-                            <h4 className="font-bold text-white text-sm">{task.name}</h4>
+        {/* --- DIRECT TASKS SECTION (New) --- */}
+        {pendingDirectTasks.length > 0 && (
+            <div className="mb-4 shrink-0">
+                <h3 className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    Solicitudes de Equipo ({pendingDirectTasks.length})
+                </h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto custom-scroll pr-1">
+                    {pendingDirectTasks.map(task => (
+                        <div key={task.id} className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex justify-between gap-3 items-start">
+                             <div>
+                                 <div className="flex items-center gap-1.5 mb-1">
+                                     <span className="text-[9px] font-black uppercase bg-red-500 text-white px-1 rounded">URGENTE</span>
+                                     <span className="text-[9px] font-bold text-red-300 uppercase">De: {task.fromUser}</span>
+                                     <span className="text-[9px] text-white/40">{new Date(task.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                 </div>
+                                 <p className="text-sm font-medium text-white leading-tight">{task.message}</p>
+                             </div>
+                             <button 
+                                onClick={() => onCompleteDirectTask(task.id)}
+                                className="h-8 w-8 rounded-lg bg-red-500 text-white flex items-center justify-center hover:bg-red-400 transition-colors shrink-0"
+                                title="Marcar como listo"
+                             >
+                                 ✓
+                             </button>
                         </div>
-                        <p className="text-[10px] text-white/40 mt-1">{task.notes || 'Sin notas adicionales'}</p>
-                    </div>
-                    {task.phone && (
-                        <a 
-                            href={`https://wa.me/${task.phone.replace(/\D/g, '')}`} 
-                            target="_blank" 
-                            className="w-8 h-8 rounded-full bg-[#25D366]/20 text-[#25D366] flex items-center justify-center hover:bg-[#25D366] hover:text-white transition-all"
-                        >
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-                        </a>
-                    )}
+                    ))}
                 </div>
-            ))}
-        </div>
+            </div>
+        )}
 
-        {/* Footer */}
-        <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-3">
-             <div className="flex items-center gap-2 text-[10px] text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                <span>Emails de recordatorio enviados automáticamente</span>
+        {/* --- CRM TASKS SECTION --- */}
+        <div className="flex flex-col flex-1 min-h-0">
+             {/* Tabs */}
+             <div className="flex gap-2 mb-4 shrink-0">
+                <button 
+                    onClick={() => setViewMode('today')}
+                    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${viewMode === 'today' ? 'bg-white text-black' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                >
+                    Para Hoy / Vencidas ({dueTasks.length})
+                </button>
+                <button 
+                    onClick={() => setViewMode('future')}
+                    className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${viewMode === 'future' ? 'bg-white text-black' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
+                >
+                    Futuras ({futureTasks.length})
+                </button>
              </div>
-            <button onClick={onClose} className="w-full py-3 bg-white text-black text-xs font-black uppercase rounded-xl hover:bg-indigo-50 hover:text-indigo-900 transition-all shadow-lg tracking-wide">
-                Comenzar a Trabajar
-            </button>
-        </div>
 
+             {/* List */}
+             <div className="space-y-3 overflow-y-auto custom-scroll pr-2 flex-1">
+                 {activeList.length === 0 ? (
+                     <div className="text-center py-10 text-white/20 text-xs font-bold uppercase tracking-widest border border-dashed border-white/10 rounded-xl">
+                         No hay leads en esta vista
+                     </div>
+                 ) : (
+                    activeList.map(task => {
+                        const isOverdue = task.nextActionDate && task.nextActionDate < today;
+                        return (
+                            <div key={task.id} className={`bg-white/5 border p-3 rounded-xl flex flex-col gap-2 group hover:border-indigo-500/30 transition-all ${isOverdue && viewMode === 'today' ? 'border-red-500/30' : 'border-white/10'}`}>
+                                <div className="flex justify-between items-start">
+                                    <div className="flex flex-col">
+                                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded w-fit mb-1 ${isOverdue ? 'bg-red-500/10 text-red-400' : 'bg-indigo-500/10 text-indigo-300'}`}>
+                                            {actionLabels[task.nextAction || 'call']}
+                                        </span>
+                                        <h4 className="text-sm font-bold text-white truncate">{task.name}</h4>
+                                    </div>
+                                    {task.nextActionDate && (
+                                        <span className={`text-[10px] font-mono font-bold ${isOverdue ? 'text-red-400' : 'text-white/40'}`}>
+                                            {new Date(task.nextActionDate).toLocaleDateString(undefined, {month:'numeric', day:'numeric'})}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[11px] text-white/50 line-clamp-2">{task.notes || 'Sin notas...'}</p>
+                                
+                                <div className="pt-2 border-t border-white/5 flex gap-2">
+                                     {task.phone && (
+                                        <a 
+                                            href={`https://wa.me/${task.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            className="flex-1 py-1.5 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center text-[10px] font-bold uppercase hover:bg-[#25D366] hover:text-white transition-all"
+                                        >
+                                            WhatsApp
+                                        </a>
+                                     )}
+                                     <div className="flex-1 flex items-center justify-end gap-2">
+                                        <input 
+                                            type="date" 
+                                            value={task.nextActionDate || ''}
+                                            onChange={(e) => onUpdateTask(task.id, { nextActionDate: e.target.value })}
+                                            className="bg-black border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white/80 focus:border-indigo-500 outline-none w-full"
+                                        />
+                                     </div>
+                                </div>
+                            </div>
+                        );
+                    })
+                 )}
+             </div>
+
+             <div className="pt-4 border-t border-white/5 mt-4 flex justify-end">
+                <button onClick={onClose} className="px-6 py-2.5 bg-white text-black text-xs font-black uppercase rounded-xl hover:bg-indigo-50 transition-all">
+                    Cerrar Agenda
+                </button>
+             </div>
+        </div>
       </div>
     </div>
   );

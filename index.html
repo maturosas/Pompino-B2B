@@ -4,11 +4,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pompino by Mati Rosas | BZS Grupo Bebidas</title>
+  <title>App B2B Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <style>
     :root {
       --bg-dark: #050505;
@@ -60,11 +61,22 @@
 <script type="importmap">
 {
   "imports": {
-    "recharts": "https://esm.sh/recharts@^3.7.0",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.40.0"
+    "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
+    "react/": "https://esm.sh/react@^18.2.0/",
+    "react": "https://esm.sh/react@^18.2.0",
+    "react-dom": "https://esm.sh/react-dom@^18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^18.2.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+    "firebase/functions": "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js",
+    "firebase/": "https://esm.sh/firebase@^12.9.0/",
+    "react-leaflet": "https://esm.sh/react-leaflet@^5.0.0?external=react,react-dom,leaflet",
+    "leaflet": "https://esm.sh/leaflet@^1.9.4",
+    "firebase-functions": "https://esm.sh/firebase-functions@^7.0.5",
+    "firebase-admin": "https://esm.sh/firebase-admin@^13.6.1",
+    "@google-analytics/data": "https://esm.sh/@google-analytics/data@^5.2.1",
+    "@google-cloud/bigquery": "https://esm.sh/@google-cloud/bigquery@^8.1.1"
   }
 }
 </script>

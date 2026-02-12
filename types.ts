@@ -14,6 +14,12 @@ export interface Lead {
   isClient?: boolean;   
   notes?: string; // Comentarios
   
+  // Geo
+  coordinates?: {
+      lat: number;
+      lng: number;
+  };
+  
   // Gestión de Tiempos y Acciones
   lastContactDate?: string; // Fecha de contacto (Automática)
   
@@ -30,7 +36,7 @@ export interface Lead {
   followUpDate?: string; // Deprecated in favor of nextActionDate, but kept for compatibility
   
   // Multi-user ownership
-  owner?: User; 
+  owner?: string; // Changed from literal union to string to support config file
 }
 
 export interface PipelineState {
@@ -44,12 +50,12 @@ export interface CRMState {
   savedLeads: Lead[];
 }
 
-export type User = 'Mati' | 'Diego' | 'Gaston' | 'TESTER';
+export type User = string; // Changed to string to allow dynamic users from projectConfig
 
 export interface OperationLog {
   id: string;
   user: User;
-  action: 'SEARCH' | 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE' | 'TRANSFER_REQUEST' | 'TRANSFER_ACCEPT';
+  action: 'SEARCH' | 'CREATE' | 'UPDATE' | 'DELETE' | 'STATUS_CHANGE' | 'TRANSFER_REQUEST' | 'TRANSFER_ACCEPT' | 'LOGIN' | 'LOGOUT' | 'ADMIN_ASSIGN';
   details: string;
   timestamp: number;
 }
@@ -62,4 +68,22 @@ export interface TransferRequest {
   toUser: User;   // Dueño actual
   status: 'pending' | 'accepted' | 'rejected';
   timestamp: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  text: string;
+  sender: User;
+  timestamp: number;
+  type: 'text' | 'system'; 
+}
+
+export interface DirectTask {
+  id: string;
+  fromUser: User;
+  toUser: User;
+  message: string;
+  status: 'pending' | 'completed';
+  createdAt: number;
+  completedAt?: number;
 }

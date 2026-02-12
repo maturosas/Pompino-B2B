@@ -1,5 +1,5 @@
 {
-  "name": "pompino-by-mati-rosas",
+  "name": "pompino-tailored-bzs",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,10 +9,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "recharts": "^3.7.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "@google/genai": "^1.40.0"
+    "recharts": "2.12.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@google/genai": "^1.40.0",
+    "firebase": "^12.9.0",
+    "react-leaflet": "^5.0.0",
+    "leaflet": "^1.9.4",
+    "firebase-functions": "^7.0.5",
+    "firebase-admin": "^13.6.1",
+    "@google-analytics/data": "^5.2.1",
+    "@google-cloud/bigquery": "^8.1.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -2,10 +2,11 @@
 import React from 'react';
 import { Lead, User } from '../types';
 import { PompinoLogo } from './PompinoLogo';
+import { PROJECT_CONFIG, getUserNames, isUserAdmin } from '../projectConfig';
 
 interface SidebarProps {
-  activeTab: 'intelligence' | 'crm' | 'operations';
-  setActiveTab: (tab: 'intelligence' | 'crm' | 'operations') => void;
+  activeTab: 'intelligence' | 'crm' | 'operations' | 'chat' | 'agenda' | 'stats';
+  setActiveTab: (tab: 'intelligence' | 'crm' | 'operations' | 'chat' | 'agenda' | 'stats') => void;
   activeFolder: string;
   setActiveFolder: (folder: string) => void;
   viewScope: User | 'me';
@@ -15,6 +16,10 @@ interface SidebarProps {
   setIsOpen: (open: boolean) => void;
   currentUser: User;
   onLogout: () => void;
+  unreadMessages: number; 
+  pendingTasksCount: number; 
+  onOpenTaskCreator: () => void; 
+  onOpenHelp: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -28,9 +33,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   isOpen, 
   setIsOpen,
   currentUser,
-  onLogout
+  onLogout,
+  unreadMessages,
+  pendingTasksCount,
+  onOpenTaskCreator,
+  onOpenHelp
 }) => {
   
+  const isAdmin = isUserAdmin(currentUser);
+
   // Filter leads based on view scope
   const scopedLeads = savedLeads.filter(l => {
       if (viewScope === 'me') return l.owner === currentUser;
@@ -45,7 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: 'client', label: 'Clientes Activos', icon: '⭐', count: scopedLeads.filter(l => l.status === 'client').length },
   ];
 
-  const teamMembers: User[] = ['Mati', 'Diego', 'Gaston', 'TESTER'];
+  const teamMembers: User[] = getUserNames();
 
   return (
     <aside className={`
@@ -60,8 +71,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
           
           <div className="min-w-0">
-            <h1 className="text-base font-black tracking-tight text-white uppercase italic leading-none">POMPINO</h1>
-            <p className="text-[9px] font-bold text-indigo-400 tracking-widest uppercase mt-0.5">By Mati Rosas</p>
+            <h1 className="text-base font-black tracking-tight text-white uppercase italic leading-none">{PROJECT_CONFIG.appName}</h1>
+            <p className="text-[9px] font-bold text-indigo-400 tracking-widest uppercase mt-0.5">{PROJECT_CONFIG.appSubtitle}</p>
           </div>
         </div>
         
@@ -76,9 +87,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       <nav className="space-y-1.5 flex-1 overflow-y-auto custom-scroll px-2">
         <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-3 px-2 mt-2">Plataforma</p>
         
+        {/* 1. BUSCAR OPORTUNIDADES (Antes Intelligence) */}
         <button
           onClick={() => setActiveTab('intelligence')}
-          className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 ${
+          className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mb-1 ${
             activeTab === 'intelligence' 
               ? 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-white shadow-lg shadow-indigo-900/20 ring-1 ring-inset ring-white/10' 
               : 'text-white/50 hover:text-white hover:bg-white/5'
@@ -87,12 +99,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           {activeTab === 'intelligence' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-r-full shadow-[0_0_10px_#6366f1]"></div>}
           <span className="text-lg opacity-80">🔭</span>
           <div className="flex flex-col min-w-0">
-            <span className="font-bold text-xs uppercase tracking-wide">Rastreo de Datos</span>
-            <span className="text-[9px] font-medium opacity-50">Buscador IA</span>
+            <span className="font-bold text-xs uppercase tracking-wide">Buscar Oportunidades</span>
+            <span className="text-[9px] font-medium opacity-50">Motor de Búsqueda IA</span>
           </div>
         </button>
 
-        <div className="pt-2">
+        {/* 2. GESTIONAR OPORTUNIDADES (CRM) */}
+        <div className="pt-1">
            <button
             onClick={() => setActiveTab('crm')}
             className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center justify-between gap-3 ${
@@ -105,34 +118,48 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center gap-3">
                 <span className="text-lg opacity-80">🗃️</span>
                 <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-xs uppercase tracking-wide">Archivo CRM</span>
+                    <span className="font-bold text-xs uppercase tracking-wide">Gestionar Oportunidades</span>
                     <span className="text-[9px] font-medium opacity-50">Base de Datos</span>
                 </div>
             </div>
-            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
-                activeTab === 'crm' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-white/30'
-            }`}>
-                {scopedLeads.length}
-            </span>
+            {activeTab === 'crm' && (
+                <span className="text-[9px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">
+                    {scopedLeads.length}
+                </span>
+            )}
           </button>
 
           {/* Sub-Folders CRM */}
           {activeTab === 'crm' && (
             <div className="ml-4 pl-4 border-l border-white/5 space-y-4 mt-2 mb-4 animate-in">
               
+               {/* Quick Task Button */}
+               <div className="pr-2">
+                   <button 
+                    onClick={onOpenTaskCreator}
+                    className="w-full py-2 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/20 hover:to-white/10 border border-white/10 rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-wide transition-all mb-2"
+                   >
+                       <span>📢</span> Asignar Tarea
+                   </button>
+               </div>
+
               {/* User Selector (Team Folders) */}
               <div className="pr-2">
                   <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest mb-2 px-1">Equipo Comercial</p>
-                  <div className="flex flex-col gap-1">
+                  
+                  {/* ADMIN VIEW: SEE ALL POOL */}
+                  {isAdmin && (
                       <button 
-                        onClick={() => setViewScope('me')}
-                        className={`text-left px-3 py-2 rounded-lg text-[10px] uppercase font-bold transition-all flex items-center gap-2 ${
-                            viewScope === 'me' ? 'bg-indigo-500/20 text-indigo-300' : 'text-white/40 hover:text-white hover:bg-white/5'
+                        onClick={() => setViewScope('me')} 
+                        className={`w-full text-left px-3 py-2 mb-1 rounded-lg text-[10px] uppercase font-bold transition-all flex items-center justify-between gap-2 ${
+                            viewScope === 'me' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-white/40 hover:text-white'
                         }`}
                       >
-                          <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                          Mi Pipeline
+                          <span className="flex items-center gap-2">⭐ Pool General</span>
                       </button>
+                  )}
+
+                  <div className="flex flex-col gap-1">
                       {teamMembers.filter(m => m !== currentUser).map(member => (
                           <button 
                             key={member}
@@ -175,31 +202,115 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
+        {/* 3. INTRANET (Chat) */}
         <button
-          onClick={() => setActiveTab('operations')}
-          className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mt-1 ${
-            activeTab === 'operations' 
-               ? 'bg-gradient-to-r from-orange-500/10 to-red-500/10 text-white shadow-lg shadow-orange-900/20 ring-1 ring-inset ring-white/10' 
+          onClick={() => setActiveTab('chat')}
+          className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center justify-between gap-3 mt-1 ${
+            activeTab === 'chat' 
+               ? 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 text-white shadow-lg shadow-blue-900/20 ring-1 ring-inset ring-white/10' 
                : 'text-white/50 hover:text-white hover:bg-white/5'
           }`}
         >
-          {activeTab === 'operations' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-orange-500 rounded-r-full shadow-[0_0_10px_#f97316]"></div>}
-          <span className="text-lg opacity-80">⚡</span>
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-xs uppercase tracking-wide">Operaciones</span>
-            <span className="text-[9px] font-medium opacity-50">Logs de Actividad</span>
+          {activeTab === 'chat' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full shadow-[0_0_10px_#3b82f6]"></div>}
+          <div className="flex items-center gap-3">
+              <span className="text-lg opacity-80">💬</span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-xs uppercase tracking-wide">Intranet</span>
+                <span className="text-[9px] font-medium opacity-50">Sala de Situación</span>
+              </div>
           </div>
+          {unreadMessages > 0 && activeTab !== 'chat' && (
+              <span className="flex items-center justify-center w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white shadow-[0_0_8px_#ef4444] animate-bounce">
+                  {unreadMessages}
+              </span>
+          )}
         </button>
+
+        {/* 4. STATS (ADMIN ONLY) */}
+        {isAdmin && (
+            <button
+            onClick={() => setActiveTab('stats')}
+            className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mt-1 ${
+                activeTab === 'stats' 
+                ? 'bg-gradient-to-r from-yellow-500/10 to-amber-500/10 text-white shadow-lg shadow-yellow-900/20 ring-1 ring-inset ring-white/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+            >
+            {activeTab === 'stats' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-yellow-500 rounded-r-full shadow-[0_0_10px_#eab308]"></div>}
+            <span className="text-lg opacity-80">📊</span>
+            <div className="flex flex-col min-w-0">
+                <span className="font-bold text-xs uppercase tracking-wide">Stats & KPIs</span>
+                <span className="text-[9px] font-medium opacity-50 text-indigo-400">Admin Only</span>
+            </div>
+            </button>
+        )}
+
+        {/* 6. AGENDA */}
+        <button
+          onClick={() => setActiveTab('agenda')}
+          className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center justify-between gap-3 mt-1 ${
+            activeTab === 'agenda' 
+               ? 'bg-gradient-to-r from-pink-500/10 to-rose-500/10 text-white shadow-lg shadow-pink-900/20 ring-1 ring-inset ring-white/10' 
+               : 'text-white/50 hover:text-white hover:bg-white/5'
+          }`}
+        >
+          {activeTab === 'agenda' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-pink-500 rounded-r-full shadow-[0_0_10px_#ec4899]"></div>}
+          <div className="flex items-center gap-3">
+              <span className="text-lg opacity-80">📅</span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-xs uppercase tracking-wide">Agenda</span>
+                <span className="text-[9px] font-medium opacity-50">Tareas & Alertas</span>
+              </div>
+          </div>
+          {pendingTasksCount > 0 && (
+              <span className="flex items-center justify-center w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white shadow-[0_0_8px_#ef4444] animate-pulse">
+                  {pendingTasksCount}
+              </span>
+          )}
+        </button>
+
+        {/* 7. OPERACIONES (ADMIN ONLY) */}
+        {isAdmin && (
+            <button
+            onClick={() => setActiveTab('operations')}
+            className={`w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 group relative flex items-center gap-3 mt-1 ${
+                activeTab === 'operations' 
+                ? 'bg-gradient-to-r from-orange-500/10 to-red-500/10 text-white shadow-lg shadow-orange-900/20 ring-1 ring-inset ring-white/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+            >
+            {activeTab === 'operations' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-orange-500 rounded-r-full shadow-[0_0_10px_#f97316]"></div>}
+            <span className="text-lg opacity-80">⚡</span>
+            <div className="flex flex-col min-w-0">
+                <span className="font-bold text-xs uppercase tracking-wide">Operaciones</span>
+                <span className="text-[9px] font-medium opacity-50 text-indigo-400">Admin Only</span>
+            </div>
+            </button>
+        )}
 
       </nav>
 
-      <div className="mt-auto pt-6 border-t border-white/5 px-2">
+      {/* Cloud Status */}
+      <div className="px-4 pb-2">
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg">
+              <span className="text-lg animate-pulse">☁️</span>
+              <div>
+                  <p className="text-[9px] font-bold text-emerald-500 uppercase">Live Sync Activo</p>
+                  <p className="text-[9px] text-white/50 leading-tight">Data compartida con el equipo.</p>
+              </div>
+          </div>
+      </div>
+
+      <div className="mt-auto pt-4 border-t border-white/5 px-2">
         <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center font-black text-xs text-white">
             {currentUser.charAt(0)}
           </div>
           <div className="flex-1 min-w-0">
-             <p className="text-[10px] font-black text-white uppercase tracking-wide">{currentUser}</p>
+             <div className="flex items-center gap-2">
+                 <p className="text-[10px] font-black text-white uppercase tracking-wide">{currentUser}</p>
+                 {isAdmin && <span className="bg-white/20 text-[8px] font-bold px-1 rounded uppercase">ADMIN</span>}
+             </div>
              <button onClick={onLogout} className="text-[9px] text-red-400 hover:text-red-300 transition-colors font-medium">Cerrar Sesión</button>
           </div>
         </div>

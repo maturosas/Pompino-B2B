@@ -42,6 +42,15 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
       setIsClosing(false);
   };
 
+  const handleSkipAmount = () => {
+      onUpdate({ 
+          status: 'client', 
+          isClient: true, 
+          nextAction: 'sale'
+      }, `Cliente Activo (Sin monto inicial)`);
+      setIsClosing(false);
+  };
+
   return (
     <div className="fixed inset-0 z-[110] flex justify-end">
       {/* Overlay */}
@@ -241,18 +250,26 @@ const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({ lead, onClose, onUpda
                              />
                              <p className="absolute -bottom-4 left-1 text-[8px] text-emerald-400/70">Solo válido para la primera venta</p>
                          </div>
-                         <button 
-                            onClick={handleCloseSale}
-                            className="w-14 h-12 md:h-14 bg-emerald-500 hover:bg-emerald-400 text-black rounded-2xl flex items-center justify-center shadow-lg transition-all"
-                         >
-                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                         </button>
-                         <button 
-                            onClick={() => setIsClosing(false)}
-                            className="w-14 h-12 md:h-14 bg-white/10 hover:bg-white/20 text-white rounded-2xl flex items-center justify-center transition-all"
-                         >
-                             ✕
-                         </button>
+                         <div className="flex flex-col gap-1 w-40">
+                             <button 
+                                onClick={handleCloseSale}
+                                className="w-full h-8 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg flex items-center justify-center shadow-lg transition-all text-[10px] font-black uppercase"
+                             >
+                                Confirmar
+                             </button>
+                             <button 
+                                onClick={handleSkipAmount}
+                                className="w-full h-8 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-all text-[10px] font-bold uppercase"
+                             >
+                                Omitir Monto
+                             </button>
+                             <button 
+                                onClick={() => setIsClosing(false)}
+                                className="w-full h-6 text-white/30 hover:text-white flex items-center justify-center transition-all text-[9px] font-bold uppercase"
+                             >
+                                Cancelar
+                             </button>
+                         </div>
                     </div>
                ) : (
                    <button 

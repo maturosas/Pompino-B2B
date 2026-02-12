@@ -7,11 +7,12 @@ import OperationsView from './components/OperationsView';
 import AgendaView from './components/AgendaView';
 import StatsView from './components/StatsView';
 import TeamChat from './components/TeamChat';
+import DashboardView from './components/DashboardView'; // Imported Dashboard
 import { PompinoLogo } from './components/PompinoLogo';
 import { Lead, User, OperationLog, TransferRequest, ChatMessage, DirectTask, ChatChannel } from './types';
 import HowToUseModal from './components/HowToUseModal';
-import ReportIssueModal from './components/ReportIssueModal'; // New Import
-import ActionCenter from './components/ActionCenter'; // Non-invasive notifications
+import ReportIssueModal from './components/ReportIssueModal'; 
+import ActionCenter from './components/ActionCenter'; 
 import { PROJECT_CONFIG, getCredentials, getUserNames, isUserAdmin } from './projectConfig';
 
 // Firebase Imports
@@ -21,18 +22,18 @@ const App: React.FC = () => {
   // Identity State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // App State
-  const [activeTab, setActiveTab] = useState<'intelligence' | 'crm' | 'operations' | 'chat' | 'agenda' | 'stats'>('intelligence');
+  // App State - Default to 'home'
+  const [activeTab, setActiveTab] = useState<'home' | 'intelligence' | 'crm' | 'operations' | 'chat' | 'agenda' | 'stats'>('home');
   const [activeFolder, setActiveFolder] = useState<string>('all');
   
-  // View Scope: 'me' means my leads, or specific User name means viewing their folder
-  const [viewScope, setViewScope] = useState<User | 'me'>('me'); 
+  // View Scope: 'me', 'all', or specific User name
+  const [viewScope, setViewScope] = useState<User | 'me' | 'all'>('me'); 
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Modal States
   const [showHelp, setShowHelp] = useState(false);
-  const [showReport, setShowReport] = useState(false); // New Report State
+  const [showReport, setShowReport] = useState(false);
   
   // Action Center State (Non-invasive Agenda)
   const [showActionCenter, setShowActionCenter] = useState(false);
@@ -598,7 +599,7 @@ const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full relative z-0 transition-all duration-300 lg:pl-72">
+      <main className="flex-1 flex flex-col h-full relative z-0 transition-all duration-300 lg:pl-72 overflow-x-hidden">
         {/* WARNING BANNER */}
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center animate-pulse">
             <p className="text-amber-400 text-[10px] md:text-xs font-black uppercase tracking-widest">
@@ -609,7 +610,7 @@ const App: React.FC = () => {
         {/* Mobile Header */}
         <div className="lg:hidden p-4 flex items-center justify-between border-b border-white/5 bg-[#050505]">
             <div className="flex items-center gap-2">
-                <div className="w-24 h-12 flex items-center justify-center">
+                <div className="w-16 h-16 flex items-center justify-center">
                     <PompinoLogo variant="full" className="w-full h-full text-white" />
                 </div>
             </div>
@@ -624,8 +625,9 @@ const App: React.FC = () => {
             
             <div className="relative z-10 max-w-7xl mx-auto w-full">
                 
-                {/* ACTION CENTER (Replaces Modal) */}
-                {showActionCenter && (
+                {/* ACTION CENTER (Only show on other tabs or if expanded logic allows, currently shown everywhere except HOME potentially, but user asked for Home to have relevant info. ActionCenter overlays content, DashboardView is content.) */}
+                {/* We will HIDE ActionCenter on 'home' tab because DashboardView covers it more extensively */}
+                {showActionCenter && activeTab !== 'home' && (
                     <ActionCenter 
                         tasks={savedLeads.filter(l => l.owner === currentUser)}
                         directTasks={directTasks.filter(t => t.toUser === currentUser)}
@@ -633,6 +635,15 @@ const App: React.FC = () => {
                         onUpdateTask={handleUpdateLead}
                         onCompleteDirectTask={handleCompleteDirectTask}
                         onClose={() => setShowActionCenter(false)}
+                    />
+                )}
+
+                {activeTab === 'home' && (
+                    <DashboardView 
+                        user={currentUser}
+                        leads={savedLeads}
+                        directTasks={directTasks}
+                        onNavigate={(tab) => setActiveTab(tab)}
                     />
                 )}
 
@@ -693,7 +704,7 @@ const App: React.FC = () => {
 
                 {activeTab === 'agenda' && (
                     <AgendaView 
-                        tasks={savedLeads.filter(l => l.owner === currentUser)} 
+                        tasks={savedLeads} // PASS ALL LEADS SO ADMIN CAN SEE ALL
                         directTasks={directTasks.filter(t => t.toUser === currentUser)}
                         user={currentUser}
                         onUpdateTask={handleUpdateLead}

@@ -13,34 +13,33 @@ export const scrapeLeads = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const memoryBlock = learningContext 
-    ? `🧠 MEMORIA: Prioriza perfiles similares a: "${learningContext}".` 
+    ? `🧠 CONTEXTO PREVIO: El usuario ha tenido éxito con: "${learningContext}". Úsalo para priorizar resultados similares.` 
     : "";
 
-  // Prompt V5: STRICT JSON MODE
-  // Se eliminan ambigüedades. Se prohíbe Markdown.
+  // Prompt V6: PROFESSIONAL BATCH EXTRACTION
   const prompt = `
-    [ROL]: Crawler B2B de Alta Velocidad.
-    [TAREA]: Extraer listado de "${type}" en "${zone}".
+    [ROL]: Eres un Analista de Inteligencia de Mercado de Élite. Tu especialidad es encontrar leads B2B de alta calidad en tiempo récord.
+    [MISIÓN]: Realizar un rastreo profundo y masivo de "${type}" en la zona "${zone}".
     ${memoryBlock}
 
-    ⚠️ REGLAS CRÍTICAS DE FORMATO (NO LAS ROMPAS):
-    1. NO escribas introducciones, ni "Aquí están los resultados", ni bloques de código markdown (\`\`\`json).
-    2. TU SALIDA DEBE SER EXCLUSIVAMENTE LÍNEAS DE JSON PURO.
-    3. Una línea = Un objeto JSON.
-    4. Si no encuentras teléfono, pon "No detectado". NO descartes el lead.
-    5. Inventa IDs únicos si es necesario.
+    [OBJETIVO]:
+    Generar un listado de MÍNIMO 15 a 20 PERFILES comerciales únicos y relevantes. Prioriza negocios operativos, con presencia digital o física verificable.
 
-    EJEMPLO DE SALIDA EXACTA:
-    {"name":"Bar Ejemplo","category":"Bar","location":"Calle Falsa 123","phone":"11223344","sourceUrl":"maps"}
-    {"name":"Kiosco Pepe","category":"Kiosco","location":"Av Siempreviva 742","phone":"No detectado","sourceUrl":"web"}
+    ⚠️ PROTOCOLO DE SALIDA ESTRICTO (JSON L):
+    1. NO escribas texto introductorio. NI UNA PALABRA.
+    2. TU SALIDA DEBE SER EXCLUSIVAMENTE LÍNEAS DE JSON VÁLIDO.
+    3. CADA LÍNEA es un objeto Lead independiente.
+    4. SINTAXIS: {"name":"...","category":"...","location":"...","phone":"...","sourceUrl":"..."}
+    5. TELÉFONOS: Haz un esfuerzo máximo por inferir o encontrar números (móvil o fijo). Si es absolutamente imposible, pon "No detectado".
+    6. CLASIFICACIÓN: En 'category' sé específico (ej: "Vinoteca Boutique" es mejor que "Comercio").
 
-    EMPIEZA AHORA. VELOCIDAD MÁXIMA.
+    ¡EJECUTA EL RASTREO MASIVO AHORA!
   `;
 
   try {
     if (onLog) {
-        onLog(`> [IA V5] 🚀 Iniciando rastreo robusto...`);
-        onLog(`> [TARGET] "${type}" en "${zone}"`);
+        onLog(`> [SISTEMA] Iniciando protocolo de rastreo masivo...`);
+        onLog(`> [TARGET] Rubro: ${type} | Zona: ${zone}`);
     }
     
     const responseStream = await ai.models.generateContentStream({
@@ -49,7 +48,7 @@ export const scrapeLeads = async (
       config: {
         tools: [{ googleSearch: {} }], 
         maxOutputTokens: 8192,
-        temperature: 0.7 // Un poco menos de temperatura para evitar alucinaciones de formato
+        temperature: 0.6 // Lower temp for more factual/structured data
       }
     });
 
@@ -62,7 +61,7 @@ export const scrapeLeads = async (
       
       buffer += text;
 
-      // Procesar línea por línea, manteniendo el remanente en el buffer
+      // Procesar línea por línea
       let newlineIndex;
       while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, newlineIndex).trim();
@@ -70,8 +69,8 @@ export const scrapeLeads = async (
 
         if (!line) continue;
 
-        // Limpieza agresiva de caracteres no JSON (por si la IA desobedece y manda markdown)
-        const cleanLine = line.replace(/```json/g, '').replace(/```/g, '').replace(/^-\s*/, ''); // Quita guiones de lista si los pone
+        // Limpieza agresiva
+        const cleanLine = line.replace(/```json/g, '').replace(/```/g, '').replace(/^-\s*/, '').trim(); 
 
         if (cleanLine.startsWith('{') && cleanLine.endsWith('}')) {
              try {
@@ -88,23 +87,22 @@ export const scrapeLeads = async (
                         whatsapp: cleanPhone.replace(/\D/g, ''),
                         phone: cleanPhone || '---',
                         location: data.location || zone,
-                        notes: data.notes || `Detectado por IA V5`,
+                        notes: data.notes || `Detectado por IA`,
                         sourceUrl: data.sourceUrl || "Búsqueda Rápida"
                     };
                     
                     onLeadFound(lead);
                     foundCount++;
-                    if (onLog) onLog(`> [DETECTADO] ${lead.name}`);
+                    if (onLog) onLog(`> [OK] ${lead.name} (${lead.category})`);
                 }
             } catch (e) {
-                // Si falla el parseo de una línea específica, la ignoramos y seguimos.
-                // No rompemos el stream completo.
+                // Ignore parse errors on partial lines
             }
         }
       }
     }
 
-    // Intentar procesar lo que quede en el buffer final
+    // Procesar remanente
     if (buffer.trim()) {
        try {
           const cleanLine = buffer.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -130,11 +128,11 @@ export const scrapeLeads = async (
     }
 
     if (onLog) {
-        onLog(`> [FIN] Rastreo completado. ${foundCount} leads estructurados.`);
+        onLog(`> [FIN] Rastreo finalizado. ${foundCount} perfiles obtenidos.`);
     }
 
   } catch (error: any) {
     console.error("Stream Error:", error);
-    if (onLog) onLog(`> [ERROR] ${error.message}`);
+    if (onLog) onLog(`> [ERROR CRÍTICO] ${error.message}`);
   }
 };

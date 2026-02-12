@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Lead, User, DirectTask } from '../types';
+import { isUserAdmin, getUserNames } from '../projectConfig';
 
 interface AgendaViewProps {
   tasks: Lead[];
@@ -12,6 +13,18 @@ interface AgendaViewProps {
 
 const AgendaView: React.FC<AgendaViewProps> = ({ tasks, directTasks, user, onUpdateTask, onCompleteDirectTask }) => {
   const [viewMode, setViewMode] = useState<'today' | 'future'>('today');
+  const [isAddActionOpen, setIsAddActionOpen] = useState(false);
+  
+  // Add Action State
+  const [newActionSearch, setNewActionSearch] = useState('');
+  const [selectedLeadId, setSelectedLeadId] = useState<string>('');
+  const [newActionType, setNewActionType] = useState<string>('call');
+  const [newActionDate, setNewActionDate] = useState<string>('');
+  const [newActionStatus, setNewActionStatus] = useState<string>('');
+
+  const isAdmin = isUserAdmin(user);
+  const allUsers = getUserNames();
+  const today = new Date().toISOString().split('T')[0];
 
   const actionLabels: Record<string, string> = {
     call: 'Llamado',
@@ -23,8 +36,6 @@ const AgendaView: React.FC<AgendaViewProps> = ({ tasks, directTasks, user, onUpd
     sale: 'Cierre Venta'
   };
 
-  const today = new Date().toISOString().split('T')[0];
-
   const { dueTasks, futureTasks } = useMemo(() => {
     const due: Lead[] = [];
     const future: Lead[] = [];
@@ -33,154 +44,253 @@ const AgendaView: React.FC<AgendaViewProps> = ({ tasks, directTasks, user, onUpd
         if (task.nextActionDate <= today) due.push(task);
         else future.push(task);
     });
-    // Ordenar: Vencidas primero, luego por fecha
+    // Sort
     due.sort((a, b) => (a.nextActionDate || '') > (b.nextActionDate || '') ? 1 : -1);
     future.sort((a, b) => (a.nextActionDate || '') > (b.nextActionDate || '') ? 1 : -1);
     
     return { dueTasks: due, futureTasks: future };
   }, [tasks, today]);
 
+  // For Add Action Search (Filter tasks passed to component)
+  const availableLeads = useMemo(() => {
+      if (!newActionSearch) return [];
+      return tasks.filter(l => l.name.toLowerCase().includes(newActionSearch.toLowerCase())).slice(0, 10);
+  }, [tasks, newActionSearch]);
+
+  const handleAddAction = () => {
+      if (!selectedLeadId || !newActionDate) return;
+      const updates: Partial<Lead> = {
+          nextAction: newActionType as any,
+          nextActionDate: newActionDate
+      };
+      if (newActionStatus) updates.status = newActionStatus as any;
+      onUpdateTask(selectedLeadId, updates);
+      
+      // Reset
+      setIsAddActionOpen(false);
+      setSelectedLeadId('');
+      setNewActionSearch('');
+      setNewActionDate('');
+      setNewActionStatus('');
+  };
+
   const activeList = viewMode === 'today' ? dueTasks : futureTasks;
   const pendingDirectTasks = directTasks.filter(t => t.status === 'pending');
-  const completedDirectTasks = directTasks.filter(t => t.status === 'completed');
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
         
         {/* Header */}
         <div className="glass-solid p-6 rounded-3xl border border-white/10 relative overflow-hidden">
-             {/* REMOVED PINK BLUR */}
              <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                  <div>
-                    <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">
+                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter">
                         Agenda de Tareas
                     </h2>
                     <p className="text-white/50 text-xs font-bold uppercase tracking-widest mt-1">
-                        Central Operativa de {user}
+                        Central Operativa
                     </p>
                  </div>
-                 <div className="flex gap-2 bg-black/40 p-1 rounded-xl border border-white/5">
+                 <div className="flex gap-2">
                     <button 
-                        onClick={() => setViewMode('today')}
-                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${viewMode === 'today' ? 'bg-white text-black shadow-lg' : 'text-white/40 hover:text-white'}`}
+                        onClick={() => setIsAddActionOpen(true)}
+                        className="h-10 px-4 bg-white hover:bg-gray-200 text-black text-[10px] font-black uppercase rounded-xl flex items-center gap-2 shadow-lg transition-all"
                     >
-                        Para Hoy ({dueTasks.length})
+                        <span>+</span> Nueva Acción
                     </button>
-                    <button 
-                        onClick={() => setViewMode('future')}
-                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${viewMode === 'future' ? 'bg-white text-black shadow-lg' : 'text-white/40 hover:text-white'}`}
-                    >
-                        Futuras ({futureTasks.length})
-                    </button>
+                    <div className="flex gap-1 bg-black p-1 rounded-xl border border-white/10">
+                        <button onClick={() => setViewMode('today')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${viewMode === 'today' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>Para Hoy</button>
+                        <button onClick={() => setViewMode('future')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${viewMode === 'future' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>Futuras</button>
+                    </div>
                  </div>
              </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* COLUMN 1: DIRECT TASKS (ALERTS) */}
+            {/* COLUMN 1: ALERTS & DIRECT TASKS */}
             <div className="lg:col-span-1 space-y-4">
-                <h3 className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Solicitudes de Equipo
-                </h3>
+                <h3 className="text-xs font-black text-white/40 uppercase tracking-widest mb-4">Solicitudes de Equipo</h3>
                 
                 {pendingDirectTasks.length === 0 ? (
                     <div className="p-6 border border-dashed border-white/10 rounded-2xl text-center">
-                        <span className="text-2xl block mb-2 opacity-30">✅</span>
-                        <p className="text-[10px] text-white/30 uppercase font-bold">No tienes solicitudes pendientes</p>
+                        <p className="text-[10px] text-white/30 uppercase font-bold">Sin solicitudes pendientes</p>
                     </div>
                 ) : (
                     pendingDirectTasks.map(task => (
-                        <div key={task.id} className="bg-gradient-to-br from-red-500/10 to-red-900/10 border border-red-500/30 rounded-2xl p-4 shadow-lg shadow-red-900/10 relative overflow-hidden group">
+                        <div key={task.id} className="bg-red-900/10 border border-red-500/20 rounded-2xl p-4 shadow-lg relative overflow-hidden group">
                              <div className="relative z-10">
                                  <div className="flex justify-between items-start mb-2">
-                                     <span className="text-[9px] font-black uppercase bg-red-500 text-white px-1.5 py-0.5 rounded">URGENTE</span>
+                                     <span className="text-[9px] font-black uppercase text-red-400">URGENTE</span>
                                      <span className="text-[9px] text-white/40">{new Date(task.createdAt).toLocaleDateString()}</span>
                                  </div>
                                  <p className="text-sm font-bold text-white mb-1">De: {task.fromUser}</p>
-                                 <p className="text-xs text-red-100/80 leading-relaxed mb-4">{task.message}</p>
+                                 <p className="text-xs text-white/70 leading-relaxed mb-4">{task.message}</p>
                                  
                                  <button 
                                     onClick={() => onCompleteDirectTask(task.id)}
-                                    className="w-full py-2 bg-red-500 hover:bg-red-400 text-white font-black text-[10px] uppercase rounded-lg transition-colors flex items-center justify-center gap-2"
+                                    className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-bold text-[10px] uppercase rounded-lg transition-colors"
                                  >
-                                     <span>✓</span> Marcar Completado
+                                     Marcar Completado
                                  </button>
                              </div>
                         </div>
                     ))
                 )}
-
-                {completedDirectTasks.length > 0 && (
-                    <div className="opacity-50 grayscale hover:grayscale-0 transition-all duration-300">
-                        <h4 className="text-[9px] font-bold text-white/20 uppercase mb-2 mt-6">Completadas Recientemente</h4>
-                        {completedDirectTasks.slice(0,3).map(task => (
-                             <div key={task.id} className="bg-white/5 border border-white/5 rounded-xl p-3 mb-2">
-                                <p className="text-[10px] text-white/40 line-through truncate">{task.message}</p>
-                             </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
             {/* COLUMN 2 & 3: CRM ACTIONS */}
-            <div className="lg:col-span-2 space-y-4">
-                 <h3 className="text-xs font-black text-white/40 uppercase tracking-widest flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Gestión Comercial ({activeList.length})
-                </h3>
+            <div className="lg:col-span-2 space-y-8">
+                 
+                 {/* MY TASKS */}
+                 <div>
+                    <h3 className="text-xs font-black text-white/40 uppercase tracking-widest mb-4">
+                        Mi Agenda ({activeList.filter(t => t.owner === user).length})
+                    </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {activeList.length === 0 ? (
-                        <div className="col-span-2 py-12 text-center border border-dashed border-white/10 rounded-2xl">
-                             <p className="text-white/20 text-xs font-bold uppercase">No hay acciones programadas en esta vista</p>
-                        </div>
-                    ) : (
-                        activeList.map(task => { // CORREGIDO: ahora usamos 'task' consistentemente
-                            const isOverdue = task.nextActionDate && task.nextActionDate < today;
-                            return (
-                                <div key={task.id} className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-4 flex flex-col justify-between gap-4 hover:border-indigo-500/30 transition-all group shadow-lg">
-                                    <div>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div className={`text-[9px] font-black uppercase px-2 py-1 rounded border ${isOverdue && viewMode === 'today' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20'}`}>
-                                                {actionLabels[task.nextAction || 'call']}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {activeList.filter(t => t.owner === user).length === 0 ? (
+                            <div className="col-span-2 py-8 text-center border border-dashed border-white/10 rounded-2xl">
+                                <p className="text-white/20 text-xs font-bold uppercase">Nada programado</p>
+                            </div>
+                        ) : (
+                            activeList.filter(t => t.owner === user).map(task => { 
+                                const isOverdue = task.nextActionDate && task.nextActionDate < today;
+                                return (
+                                    <div key={task.id} className="bg-[#050505] border border-white/10 rounded-2xl p-4 flex flex-col justify-between gap-4 hover:border-white/20 transition-all group shadow-lg">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className={`text-[9px] font-black uppercase px-2 py-1 rounded border ${isOverdue && viewMode === 'today' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-white/5 text-white/60 border-white/10'}`}>
+                                                    {actionLabels[task.nextAction || 'call']}
+                                                </div>
+                                                {task.nextActionDate && (
+                                                    <span className={`text-[10px] font-mono font-bold ${isOverdue ? 'text-red-400' : 'text-white/40'}`}>
+                                                        {new Date(task.nextActionDate).toLocaleDateString(undefined, {month:'numeric', day:'numeric'})}
+                                                    </span>
+                                                )}
                                             </div>
-                                            {task.nextActionDate && (
-                                                <span className={`text-[10px] font-mono font-bold ${isOverdue ? 'text-red-400' : 'text-white/40'}`}>
-                                                    {new Date(task.nextActionDate).toLocaleDateString(undefined, {month:'numeric', day:'numeric'})}
-                                                </span>
+                                            <h4 className="text-sm font-bold text-white truncate">{task.name}</h4>
+                                            <p className="text-[11px] text-white/50 mt-1 line-clamp-2 min-h-[2.5em]">{task.notes || 'Sin notas...'}</p>
+                                        </div>
+                                        
+                                        <div className="pt-3 border-t border-white/5 flex items-center gap-2">
+                                            {task.phone && (
+                                                <a href={`https://wa.me/${task.phone.replace(/\D/g, '')}`} target="_blank" className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center hover:bg-emerald-500 hover:text-black transition-all">
+                                                    W
+                                                </a>
                                             )}
-                                        </div>
-                                        <h4 className="text-sm font-bold text-white truncate">{task.name}</h4>
-                                        <p className="text-[11px] text-white/50 mt-1 line-clamp-2 min-h-[2.5em]">{task.notes || 'Sin notas...'}</p>
-                                    </div>
-                                    
-                                    <div className="pt-3 border-t border-white/5 flex items-center gap-2">
-                                         {task.phone && (
-                                            <a 
-                                                href={`https://wa.me/${task.phone.replace(/\D/g, '')}`} 
-                                                target="_blank" 
-                                                className="h-8 w-8 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366] hover:text-white transition-all"
-                                            >
-                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-                                            </a>
-                                        )}
-                                        <div className="flex-1 flex items-center justify-end gap-2">
-                                            <span className="text-[9px] text-white/30 uppercase font-bold">Re-Agendar:</span>
-                                            <input 
-                                                type="date" 
-                                                value={task.nextActionDate || ''}
-                                                onChange={(e) => onUpdateTask(task.id, { nextActionDate: e.target.value })}
-                                                className="bg-black border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white/80 focus:border-indigo-500 outline-none w-28 text-right"
-                                            />
+                                            <div className="flex-1 flex items-center justify-end gap-2">
+                                                <input 
+                                                    type="date" 
+                                                    value={task.nextActionDate || ''}
+                                                    onChange={(e) => onUpdateTask(task.id, { nextActionDate: e.target.value })}
+                                                    className="bg-black border border-white/10 rounded-lg px-2 py-1 text-[10px] text-white/80 focus:border-white outline-none w-28 text-right"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )
-                        })
-                    )}
-                </div>
+                                )
+                            })
+                        )}
+                    </div>
+                 </div>
             </div>
         </div>
+
+        {/* ADD ACTION MODAL */}
+        {isAddActionOpen && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+                <div className="bg-[#111] border border-white/10 rounded-3xl w-full max-w-md p-6 shadow-2xl">
+                    <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-4">Agregar Acción Manual</h3>
+                    <div className="space-y-4">
+                        {/* Lead Select */}
+                        <div>
+                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Buscar Lead / Cliente</label>
+                            <input 
+                                autoFocus
+                                type="text"
+                                value={newActionSearch}
+                                onChange={(e) => setNewActionSearch(e.target.value)}
+                                placeholder="Escribe el nombre de la cuenta..."
+                                className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-sm text-white outline-none focus:border-white"
+                            />
+                            {newActionSearch.length > 1 && !selectedLeadId && (
+                                <div className="mt-2 bg-white/5 rounded-xl overflow-hidden max-h-40 overflow-y-auto border border-white/5">
+                                    {availableLeads.map(l => (
+                                        <div 
+                                            key={l.id} 
+                                            onClick={() => { setSelectedLeadId(l.id); setNewActionSearch(l.name); }}
+                                            className="px-3 py-2 hover:bg-white/10 cursor-pointer flex justify-between items-center"
+                                        >
+                                            <span className="text-xs text-white truncate">{l.name}</span>
+                                            <span className="text-[9px] text-white/40 uppercase">{l.status}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {selectedLeadId && (
+                                <div className="mt-1 flex items-center gap-2">
+                                    <span className="text-emerald-400 text-xs font-bold">✓ Seleccionado</span>
+                                    <button onClick={() => { setSelectedLeadId(''); setNewActionSearch(''); }} className="text-[10px] text-white/40 underline">Cambiar</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Action Type */}
+                        <div>
+                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Tipo de Acción</label>
+                            <select 
+                                value={newActionType}
+                                onChange={(e) => setNewActionType(e.target.value)}
+                                className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-sm text-white outline-none focus:border-white"
+                            >
+                                {Object.entries(actionLabels).map(([key, label]) => (
+                                    <option key={key} value={key}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Date */}
+                        <div>
+                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Fecha Programada</label>
+                            <input 
+                                type="date"
+                                value={newActionDate}
+                                onChange={(e) => setNewActionDate(e.target.value)}
+                                className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-sm text-white outline-none focus:border-white"
+                            />
+                        </div>
+
+                        {/* Status (Optional) */}
+                        <div>
+                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5 block">Actualizar Estado (Opcional)</label>
+                            <select 
+                                value={newActionStatus}
+                                onChange={(e) => setNewActionStatus(e.target.value)}
+                                className="w-full h-10 bg-black/50 border border-white/10 rounded-xl px-3 text-sm text-white/70 outline-none focus:border-white"
+                            >
+                                <option value="">-- Mantener Estado Actual --</option>
+                                <option value="frio">FRIO</option>
+                                <option value="contacted">CONTACTADO</option>
+                                <option value="negotiation">NEGOCIACIÓN</option>
+                                <option value="client">CLIENTE</option>
+                            </select>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button onClick={() => setIsAddActionOpen(false)} className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white uppercase">Cancelar</button>
+                            <button 
+                                onClick={handleAddAction}
+                                disabled={!selectedLeadId || !newActionDate}
+                                className="px-6 py-2 bg-white hover:bg-gray-200 disabled:opacity-50 text-black text-xs font-black uppercase rounded-xl transition-all shadow-lg"
+                            >
+                                Programar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

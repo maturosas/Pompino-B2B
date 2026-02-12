@@ -65,15 +65,14 @@ export const PompinoLogo: React.FC<PompinoLogoProps> = ({ className, variant = '
 
   return (
     <svg 
-      viewBox="0 0 400 400" 
+      viewBox="0 0 400 370" 
       fill="none" 
       className={className} 
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* 
          DESIGN STRATEGY:
-         - Vertical Stack: Owl Icon -> Main Title -> Subtitles
-         - Centered at x=200
+         - Reduced ViewBox Height (400 -> 370) to remove bottom whitespace and increase size.
          - High contrast (White on Dark) for max legibility
       */}
 
@@ -108,12 +107,12 @@ export const PompinoLogo: React.FC<PompinoLogoProps> = ({ className, variant = '
       {/* --- SUBTITLES --- */}
       
       {/* Increased Size for BZS */}
-      <text x="200" y="325" textAnchor="middle" fontFamily="sans-serif" fontWeight="900" fontSize="22" letterSpacing="2" fill="currentColor" opacity="0.9">
+      <text x="200" y="325" textAnchor="middle" fontFamily="sans-serif" fontWeight="900" fontSize="24" letterSpacing="2" fill="currentColor" opacity="1">
         BZS GRUPO BEBIDAS
       </text>
 
       {/* Increased Size for Signature */}
-      <text x="200" y="350" textAnchor="middle" fontFamily="monospace" fontWeight="500" fontSize="14" letterSpacing="2" fill="currentColor" opacity="0.6">
+      <text x="200" y="350" textAnchor="middle" fontFamily="monospace" fontWeight="500" fontSize="16" letterSpacing="2" fill="currentColor" opacity="0.8">
         by Mati Rosas
       </text>
 

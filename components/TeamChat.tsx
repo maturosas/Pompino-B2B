@@ -134,7 +134,7 @@ const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, on
                           <span className="truncate">{channel.name}</span>
                       </div>
                       
-                      {/* Admin can edit ANY channel. Creator can edit their own private channels. */}
+                      {/* Admin can edit ANY channel (including General). Creator can edit their own private channels. */}
                       {(isAdmin || (!channel.isSystem && channel.createdBy === currentUser)) && (
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <span 
@@ -144,13 +144,15 @@ const TeamChat: React.FC<TeamChatProps> = ({ messages, channels, currentUser, on
                               >
                                 ✏️
                               </span>
-                              <span 
-                                onClick={(e) => handleDeleteChannel(e, channel.id)}
-                                className="p-1 hover:bg-red-500/20 rounded text-white/50 hover:text-red-400"
-                                title="Eliminar"
-                              >
-                                🗑️
-                              </span>
+                              {!channel.isSystem && (
+                                  <span 
+                                    onClick={(e) => handleDeleteChannel(e, channel.id)}
+                                    className="p-1 hover:bg-red-500/20 rounded text-white/50 hover:text-red-400"
+                                    title="Eliminar"
+                                  >
+                                    🗑️
+                                  </span>
+                              )}
                           </div>
                       )}
                   </button>

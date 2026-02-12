@@ -20,7 +20,8 @@ export const PROJECT_CONFIG = {
   users: [
     { name: 'BZS', password: '', color: 'bg-rose-600', avatar: 'B', role: 'admin', commissionEligible: false },
     { name: 'Diego', password: '', color: 'bg-emerald-600', avatar: 'D', role: 'user', commissionEligible: true },
-    { name: 'Gaston', password: '', color: 'bg-amber-600', avatar: 'G', role: 'user', commissionEligible: true }
+    { name: 'Gaston', password: '', color: 'bg-amber-600', avatar: 'G', role: 'user', commissionEligible: true },
+    { name: 'Ezur', password: '', color: 'bg-blue-600', avatar: 'E', role: 'user', commissionEligible: true }
   ]
 };
 

@@ -14,7 +14,7 @@ interface CRMViewProps {
   onImportLeads: (leads: Lead[]) => void;
   activeFolder: string;
   currentUser: User;
-  viewScope: User | 'me';
+  viewScope: User | 'me' | 'all';
   transferRequests: TransferRequest[];
   onResolveTransfer: (requestId: string, accepted: boolean) => void;
   onRequestTransfer: (lead: Lead) => void;
@@ -75,6 +75,7 @@ const CRMView: React.FC<CRMViewProps> = ({
   const processedLeads = useMemo(() => {
     // 1. Scope Filter
     let result = leads.filter(l => {
+        if (viewScope === 'all') return true; // POOL GENERAL: Show all leads
         if (viewScope === 'me') return l.owner === currentUser;
         return l.owner === viewScope;
     });
@@ -196,6 +197,17 @@ const CRMView: React.FC<CRMViewProps> = ({
           saleValue: value
       }, `Cierre Venta: $${value}`);
       
+      setLeadToClose(null);
+      setClosingSaleAmount('');
+  };
+
+  const skipSaleAmount = () => {
+      if (!leadToClose) return;
+      onDetailedUpdate(leadToClose, {
+          status: 'client',
+          isClient: true,
+          nextAction: 'sale'
+      }, `Cierre Venta (Sin Monto/Omitido)`);
       setLeadToClose(null);
       setClosingSaleAmount('');
   };
@@ -401,7 +413,7 @@ const CRMView: React.FC<CRMViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                     {viewScope !== 'me' && <span className="bg-indigo-500 text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase">Carpeta: {viewScope}</span>}
+                     {viewScope !== 'me' && <span className="bg-indigo-500 text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase">Carpeta: {viewScope === 'all' ? 'POOL GENERAL' : viewScope}</span>}
                      {isAdmin && viewScope !== 'me' && <span className="bg-white/10 text-white/50 text-[9px] font-bold px-2 py-0.5 rounded uppercase">Modo Admin: Supervisión</span>}
                 </div>
                 <h2 className="text-xl md:text-3xl font-black italic uppercase tracking-tighter text-white drop-shadow-md truncate">
@@ -492,8 +504,9 @@ const CRMView: React.FC<CRMViewProps> = ({
                             <h3 className="text-sm font-bold text-white truncate leading-tight">{lead.name}</h3>
                             <p className="text-[11px] text-white/50 truncate mt-0.5">{lead.contactName || 'Sin contacto'}</p>
                         </div>
-                        {isAdmin && (
-                            <div className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded font-bold uppercase">{lead.owner}</div>
+                        {/* Always show owner if in All/Pool mode or Admin */}
+                        {(isAdmin || viewScope === 'all') && (
+                            <div className="text-[9px] bg-white/10 px-1.5 py-0.5 rounded font-bold uppercase whitespace-nowrap">{lead.owner}</div>
                         )}
                         <select 
                             value={lead.status} 
@@ -550,7 +563,8 @@ const CRMView: React.FC<CRMViewProps> = ({
               <tr className="bg-white/[0.02] text-white/40 text-[10px] font-black uppercase tracking-widest border-b border-white/5">
                 <th onClick={() => handleSort('name')} className="px-6 py-4 w-[20%] cursor-pointer hover:text-white transition-colors select-none">Cuenta {sortKey === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
                 <th className="px-6 py-4 w-[15%]">POC</th>
-                {isAdmin && <th className="px-6 py-4 w-[10%] text-indigo-300">Asignado A</th>}
+                {/* FIXED COLUMN HEADER FOR ASSIGNMENT */}
+                {(isAdmin || viewScope === 'all') && <th className="px-6 py-4 w-[10%] text-indigo-300">Asignado</th>}
                 <th className="px-6 py-4 w-[10%]">Contacto</th>
                 <th onClick={() => handleSort('status')} className="px-6 py-4 w-[10%] cursor-pointer hover:text-white transition-colors select-none">Status</th>
                 <th onClick={() => handleSort('nextActionDate')} className="px-6 py-4 w-[15%] cursor-pointer hover:text-white transition-colors select-none">Agenda {sortKey === 'nextActionDate' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
@@ -578,18 +592,22 @@ const CRMView: React.FC<CRMViewProps> = ({
                       )}
                     </td>
                     
-                    {/* ADMIN: ASSIGNMENT DROPDOWN */}
-                    {isAdmin && (
+                    {/* ADMIN OR POOL VIEW: ASSIGNMENT DROPDOWN OR LABEL */}
+                    {(isAdmin || viewScope === 'all') && (
                         <td className="px-6 py-3 align-middle">
-                            <select 
-                                value={lead.owner || ''} 
-                                onChange={(e) => onDetailedUpdate(lead.id, { owner: e.target.value }, `Reasignado a ${e.target.value}`)}
-                                className="bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] font-bold uppercase text-white outline-none focus:border-indigo-500"
-                            >
-                                {userList.map(u => (
-                                    <option key={u} value={u} className="text-black">{u}</option>
-                                ))}
-                            </select>
+                            {isAdmin ? (
+                                <select 
+                                    value={lead.owner || ''} 
+                                    onChange={(e) => onDetailedUpdate(lead.id, { owner: e.target.value }, `Reasignado a ${e.target.value}`)}
+                                    className="bg-white/5 border border-white/10 rounded px-2 py-1 text-[10px] font-bold uppercase text-white outline-none focus:border-indigo-500 w-full"
+                                >
+                                    {userList.map(u => (
+                                        <option key={u} value={u} className="text-black">{u}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="text-[10px] font-bold uppercase text-white/70 bg-white/5 px-2 py-1 rounded">{lead.owner}</span>
+                            )}
                         </td>
                     )}
 
@@ -701,18 +719,24 @@ const CRMView: React.FC<CRMViewProps> = ({
                           />
                           <p className="text-[9px] text-white/40 mt-1.5">Escribir únicamente el valor de la primer venta</p>
                       </div>
-                      <div className="flex justify-end gap-2 pt-2">
-                          <button 
-                              onClick={() => { setLeadToClose(null); setClosingSaleAmount(''); }} 
-                              className="px-4 py-2 text-xs font-bold text-white/40 hover:text-white uppercase"
-                          >
-                              Cancelar
-                          </button>
+                      <div className="flex flex-col gap-2 pt-2">
                           <button 
                               onClick={confirmCloseSale}
-                              className="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase shadow-lg"
+                              className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black rounded-xl text-xs font-black uppercase shadow-lg"
                           >
-                              Confirmar
+                              Confirmar Monto
+                          </button>
+                          <button 
+                              onClick={skipSaleAmount}
+                              className="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black uppercase"
+                          >
+                              Ya es Cliente (Omitir Monto)
+                          </button>
+                          <button 
+                              onClick={() => { setLeadToClose(null); setClosingSaleAmount(''); }} 
+                              className="w-full py-2 text-xs font-bold text-white/40 hover:text-white uppercase mt-2"
+                          >
+                              Cancelar
                           </button>
                       </div>
                   </div>

@@ -61,7 +61,7 @@ const HowToUseModal: React.FC<HowToUseModalProps> = ({ isOpen, onClose }) => {
     },
     {
       id: 'transfer',
-      icon: 'qh',
+      icon: ' arrows_exchange',
       title: 'Transferencia de Leads',
       shortDesc: 'Cómo pasar un cliente a otro vendedor.',
       fullDesc: 'Si intentas guardar o editar un lead que pertenece a otro usuario, el sistema te bloqueará. Debes usar el botón de "Solicitar Transferencia" (ícono de flechas). El dueño actual recibirá una notificación en su CRM para Aceptar o Rechazar el traspaso.'

@@ -4,6 +4,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- CACHE BUSTING: Force browser to check for updates every time -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <title>App B2B Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,16 +63,56 @@
     /* Animation Utilities */
     .animate-in { animation: fadeIn 0.4s ease-out; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* --- UNIFIED LOGO ANIMATIONS --- */
+    @keyframes logoSlideLeft {
+      from { opacity: 0; transform: translateX(-40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes logoSlideRight {
+      from { opacity: 0; transform: translateX(40px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes logoGlassImpact {
+      0% { transform: translateX(-200px); opacity: 0; }
+      60% { transform: translateX(10px); opacity: 1; } /* Overshoot */
+      80% { transform: translateX(-5px); } /* Settle back */
+      100% { transform: translateX(0px); opacity: 1; }
+    }
+    @keyframes wineSplash {
+      0% { transform: translateY(0) scale(0.5); opacity: 0; }
+      30% { transform: translateY(-15px) scale(1); opacity: 1; }
+      100% { transform: translateY(10px) scale(0); opacity: 0; }
+    }
+    @keyframes liquidSlosh {
+      0% { transform: rotate(0deg); }
+      25% { transform: rotate(-15deg); }
+      50% { transform: rotate(10deg); }
+      75% { transform: rotate(-5deg); }
+      100% { transform: rotate(0deg); }
+    }
+    @keyframes flowInStraw {
+      0% { offset: 0; }
+      100% { offset: 1; }
+    }
+    .animate-logo-icon { animation: logoSlideLeft 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    .animate-logo-text { animation: logoSlideRight 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    .animate-logo-glass { animation: logoGlassImpact 1.2s cubic-bezier(0.1, 0.9, 0.2, 1.2) 0.4s forwards; }
+    .animate-wine-splash { animation: wineSplash 0.6s ease-out 1.1s forwards; }
+    .animate-liquid { animation: liquidSlosh 2s ease-in-out infinite; transform-origin: 10px 12px; }
+
   </style>
 <script type="importmap">
 {
   "imports": {
+    "zustand": "https://esm.sh/zustand@4.5.2",
+    "zustand/": "https://esm.sh/zustand@4.5.2/",
     "recharts": "https://esm.sh/recharts@2.12.0?external=react,react-dom",
     "react/": "https://esm.sh/react@^18.2.0/",
     "react": "https://esm.sh/react@^18.2.0",
     "react-dom": "https://esm.sh/react-dom@^18.2.0",
     "react-dom/": "https://esm.sh/react-dom@^18.2.0/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+    "@google/genai": "https://esm.sh/@google/genai@^0.14.0",
     "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
     "firebase/functions": "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js",
@@ -78,12 +124,19 @@
     "@google-analytics/data": "https://esm.sh/@google-analytics/data@^5.2.1",
     "@google-cloud/bigquery": "https://esm.sh/@google-cloud/bigquery@^8.1.1",
     "firebase-functions/": "https://esm.sh/firebase-functions@^7.0.5/",
-    "nodemailer": "https://esm.sh/nodemailer@^8.0.1"
+    "nodemailer": "https://esm.sh/nodemailer@^8.0.1",
+    "react-window": "https://esm.sh/react-window@1.8.10?external=react,react-dom"
   }
 }
 </script>
 </head>
 <body>
   <div id="root"></div>
+  <script>
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = `./index.tsx?v=${Date.now()}`;
+    document.body.appendChild(script);
+  </script>
 </body>
 </html>

@@ -1,11 +1,30 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit } from "firebase/firestore";
+// FIX: Add missing firestore functions and types to be re-exported for pagination and querying.
+import { 
+    getFirestore, 
+    collection, 
+    doc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    onSnapshot, 
+    query, 
+    orderBy, 
+    limit,
+    startAfter,
+    getDocs,
+    where,
+    type QueryConstraint,
+    type DocumentSnapshot
+} from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 // --- CONFIGURACIÓN DE FIREBASE ---
 // 📍 IMPORTANTE: Crea un nuevo proyecto en Firebase Console y reemplaza estas claves
 // para que la nueva app tenga su propia base de datos separada.
+// 🔒 SEGURIDAD: Para un despliegue en producción, estas claves deberían ser gestionadas
+// a través de variables de entorno, no hardcodeadas directamente.
 
 const firebaseConfig = {
   apiKey: "AIzaSyCT1r2CJvtAfW6yUWTBICGWnjK4dKtWjsM", // <- Pegar nueva API Key
@@ -17,12 +36,28 @@ const firebaseConfig = {
   measurementId: "G-Z05CW7Z73N"
 };
 
-// Validamos si el usuario ya pegó sus claves reales
-export const isConfigured = firebaseConfig.apiKey !== "PEGAR_AQUI_TU_API_KEY" && firebaseConfig.apiKey !== "";
+// Se elimina el chequeo de la API key de ejemplo para desbloquear el inicio.
+export const isConfigured = !!firebaseConfig.apiKey;
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const functions = getFunctions(app); // Inicializamos Cloud Functions
 
-export { collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit, httpsCallable };
+// FIX: Re-export the newly imported members so they are available across the app.
+export { 
+    collection, 
+    doc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    onSnapshot, 
+    query, 
+    orderBy, 
+    limit, 
+    httpsCallable,
+    startAfter,
+    getDocs,
+    where
+};
+export type { QueryConstraint, DocumentSnapshot };

@@ -4,13 +4,18 @@ import React from 'react';
 interface PompinoLogoProps {
   className?: string;
   variant?: 'full' | 'icon';
+  animate?: boolean; // Prop to trigger animation
 }
 
-export const PompinoLogo: React.FC<PompinoLogoProps> = ({ className, variant = 'full' }) => {
+export const PompinoLogo: React.FC<PompinoLogoProps> = ({ className, variant = 'full', animate = false }) => {
   
-  // Shared Owl Path Elements (Using currentColor for flexibility)
+  // --- Simplified Animation Class Logic ---
+  const iconClass = animate ? 'animate-logo-icon' : '';
+  const textClass = animate ? 'animate-logo-text' : '';
+
+  // Shared Owl Path Elements
   const OwlContent = () => (
-      <g>
+      <g className={iconClass}>
         {/* Top Hat */}
         <path d="M 55 50 L 145 50 L 145 5 L 55 5 Z" fill="currentColor" />
         <rect x="55" y="35" width="90" height="15" fill="#111" /> {/* Band */}
@@ -32,90 +37,62 @@ export const PompinoLogo: React.FC<PompinoLogoProps> = ({ className, variant = '
         <circle cx="65" cy="115" r="28" fill="#050505" />
         <circle cx="135" cy="115" r="28" fill="#050505" />
 
-        {/* Pupils (White -> currentColor) */}
+        {/* Pupils */}
         <circle cx="65" cy="115" r="8" fill="currentColor" />
         <circle cx="135" cy="115" r="8" fill="currentColor" />
         
-        {/* Eye Glint (Life) */}
+        {/* Eye Glint */}
         <circle cx="68" cy="112" r="2" fill="#050505" />
         <circle cx="138" cy="112" r="2" fill="#050505" />
 
         {/* Beak */}
         <path d="M 100 150 L 88 135 L 112 135 Z" fill="currentColor" />
+        {/* Mouth */}
+        <path d="M 95 155 Q 100 160 105 155" stroke="currentColor" strokeWidth="1.5" fill="none" />
 
-        {/* Monocle (Viewer's Left) */}
+        {/* Monocle */}
         <circle cx="65" cy="115" r="32" stroke="currentColor" strokeWidth="2.5" fill="none" />
-        {/* Monocle String */}
         <path d="M 33 115 Q 20 150 40 180" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.8" />
       </g>
   );
 
   if (variant === 'icon') {
       return (
-        <svg 
-            viewBox="0 0 200 200" 
-            fill="none" 
-            className={className} 
-            xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg viewBox="0 0 200 200" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
             <OwlContent />
         </svg>
       );
   }
 
   return (
-    <svg 
-      viewBox="0 0 400 370" 
-      fill="none" 
-      className={className} 
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* 
-         DESIGN STRATEGY:
-         - Reduced ViewBox Height (400 -> 370) to remove bottom whitespace and increase size.
-         - High contrast (White on Dark) for max legibility
-      */}
+    <svg viewBox="0 0 400 360" fill="none" className={className} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        {/* Shadow Filter */}
+        <filter id="deep-drop-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="3.5"/>
+          <feOffset dx="3" dy="4" result="offsetblur"/>
+          <feComponentTransfer><feFuncA type="linear" slope="0.7"/></feComponentTransfer>
+          <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
 
-      {/* --- OWL ICON (GENTLEMAN) --- */}
-      <g transform="translate(105, 30) scale(0.95)">
+      {/* --- OWL ICON (Larger and centered) --- */}
+      <g transform="translate(100, 60) scale(1.15)">
         <OwlContent />
       </g>
 
-      {/* --- TITLE: POMP [GLASS] NO --- */}
-      {/* Centered vertically around y=280 to leave space for the Owl above */}
-      
-      <text x="192" y="280" textAnchor="end" fontFamily="sans-serif" fontWeight="900" fontSize="48" letterSpacing="3" fill="currentColor">
-        POMP
-      </text>
-
-      {/* Wine Glass Icon (Replacing the 'I') */}
-      <g transform="translate(196, 245)">
-          {/* Bowl */}
-          <path d="M 0 0 Q 0 25 10 25 Q 20 25 20 0" fill="none" stroke="currentColor" strokeWidth="3" />
-          {/* Liquid Level */}
-          <path d="M 2 8 Q 10 12 18 8 L 18 0 L 2 0 Z" fill="currentColor" opacity="0.8" />
-          {/* Stem */}
-          <line x1="10" y1="25" x2="10" y2="42" stroke="currentColor" strokeWidth="3" />
-          {/* Base */}
-          <line x1="2" y1="42" x2="18" y2="42" stroke="currentColor" strokeWidth="3" />
+      {/* --- TEXT GROUP --- */}
+      <g className={textClass} style={{ filter: 'url(#deep-drop-shadow)' }}>
+        <text x="200" y="280" textAnchor="middle" fontFamily="sans-serif" fontWeight="900" fontSize="52" letterSpacing="3" fill="currentColor">
+            POMPINO
+        </text>
+        <text x="200" y="325" textAnchor="middle" fontFamily="sans-serif" fontWeight="900" fontSize="24" letterSpacing="2" fill="currentColor">
+            BZS GRUPO BEBIDAS
+        </text>
+        <text x="200" y="350" textAnchor="middle" fontFamily="monospace" fontWeight="500" fontSize="16" letterSpacing="2" fill="currentColor" opacity="0.8">
+            by Mati Rosas
+        </text>
       </g>
-
-      <text x="222" y="280" textAnchor="start" fontFamily="sans-serif" fontWeight="900" fontSize="48" letterSpacing="3" fill="currentColor">
-        NO
-      </text>
-
-      {/* --- SUBTITLES --- */}
-      
-      {/* Increased Size for BZS */}
-      <text x="200" y="325" textAnchor="middle" fontFamily="sans-serif" fontWeight="900" fontSize="24" letterSpacing="2" fill="currentColor" opacity="1">
-        BZS GRUPO BEBIDAS
-      </text>
-
-      {/* Increased Size for Signature */}
-      <text x="200" y="350" textAnchor="middle" fontFamily="monospace" fontWeight="500" fontSize="16" letterSpacing="2" fill="currentColor" opacity="0.8">
-        by Mati Rosas
-      </text>
-
     </svg>
   );
 };

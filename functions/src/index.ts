@@ -1,258 +1,261 @@
+
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import { BigQuery } from "@google-cloud/bigquery";
 import * as nodemailer from "nodemailer";
+import { GoogleGenAI, Type } from "@google/genai";
+
+// --- TYPES (COPIED FROM types.ts FOR SELF-CONTAINMENT AND BUILD STABILITY) ---
+export type User = string;
+
+export interface Lead {
+  id: string;
+  name: string;
+  location: string;
+  category: string;
+  phone: string;
+  email: string;
+  whatsapp?: string;
+  status: 'frio' | 'contacted' | 'negotiation' | 'client';
+  sourceUrl?: string;
+  savedAt?: number;
+  contactName?: string;
+  isClient?: boolean;
+  notes?: string;
+  coordinates?: { lat: number; lng: number; };
+  lastContactDate?: string;
+  nextAction?: 'call' | 'whatsapp' | 'email' | 'visit' | 'quote' | 'offer' | 'sale';
+  nextActionDate?: string;
+  priceList?: 'special' | 'wholesale' | 'discount_15' | 'regular';
+  saleValue?: number;
+  decisionMaker?: string;
+  businessPotential?: 'low' | 'medium' | 'high';
+  deliveryZone?: string;
+  paymentTerms?: string;
+  followUpDate?: string;
+  owner?: User;
+  crmStatus?: {
+    status: 'free' | 'owned' | 'locked';
+    owner?: User;
+  };
+  tags?: string[];
+}
+// --- END TYPES ---
+
 
 // Ensure Admin SDK is initialized
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-// Project Configuration Reference
-// Project ID: pompino-b2b
-
-// Lazy initialization of BigQuery
-let bigqueryInstance: BigQuery | null = null;
-const getBigQuery = () => {
-    if (!bigqueryInstance) {
-        bigqueryInstance = new BigQuery();
-    }
-    return bigqueryInstance;
-};
+const db = admin.firestore();
 
 // --- EMAIL CONFIGURATION ---
-// ⚠️ IMPORTANT: Configure these variables in Firebase:
-// firebase functions:config:set email.user="tu_email@gmail.com" email.pass="tu_contraseña_de_aplicacion"
-// Casting functions to any to avoid "Type 'never' has no call signatures" error with v1 import
-const gmailEmail = (functions as any).config().email?.user || "tu_sistema@gmail.com"; 
+const gmailEmail = (functions as any).config().email?.user || "tu_sistema@gmail.com";
 const gmailPassword = (functions as any).config().email?.pass || "password_temporal";
 
 const mailTransport = nodemailer.createTransport({
   service: 'gmail',
-  auth: {
-    user: gmailEmail,
-    pass: gmailPassword,
-  },
+  auth: { user: gmailEmail, pass: gmailPassword },
 });
+
+
+// --- NEW RESILIENT ENGINE "HUNTER v3": FINDS AND ENRICHES LEADS IN PARALLEL ---
+export const findAndEnrichLeads = functions
+  .runWith({ timeoutSeconds: 540, memory: "1GB" })
+  .https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.name) {
+      throw new functions.https.HttpsError('unauthenticated', 'The function must be called by an authenticated user.');
+    }
+    const currentUser = context.auth.token.name;
+    const { type, zone } = data;
+
+    if (!zone || !type) {
+      throw new functions.https.HttpsError('invalid-argument', 'Function requires "zone" and "type".');
+    }
+
+    const apiKey = (functions as any).config().gemini?.key;
+    if (!apiKey) {
+      throw new functions.https.HttpsError('failed-precondition', 'The Gemini API key is not configured.');
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    // --- STEP 1: DISCOVER BUSINESSES ---
+    let discoveredBusinesses: { name: string, category: string }[] = [];
+    try {
+        const discoveryPrompt = `Using Google Search, find up to 15 business names of type "${type}" located in or very close to "${zone}". For each, provide its main category. Prioritize businesses that likely have websites or public contact info. Respond ONLY with a valid JSON array.`;
+        const discoverySchema = {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "Nombre del negocio." },
+              category: { type: Type.STRING, description: "Categoría principal del negocio." }
+            },
+            required: ["name", "category"],
+          }
+        };
+
+        const discoveryResponse = await ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: discoveryPrompt,
+            config: {
+                systemInstruction: "You are a B2B discovery specialist. Your only output is a clean JSON array.",
+                tools: [{ googleSearch: {} }],
+                temperature: 0.3,
+                responseMimeType: "application/json",
+                responseSchema: discoverySchema,
+            }
+        });
+
+        const responseText = discoveryResponse.text?.trim();
+        if (responseText) {
+            let cleanResponseText = responseText;
+            if (cleanResponseText.startsWith('```json')) {
+                cleanResponseText = cleanResponseText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+            }
+            discoveredBusinesses = JSON.parse(cleanResponseText);
+        }
+
+        if (!Array.isArray(discoveredBusinesses) || discoveredBusinesses.length === 0) {
+             return { success: true, leads: [] };
+        }
+
+    } catch (error: any) {
+        console.error("CRITICAL HUNTER v3 DISCOVERY ERROR:", error);
+        throw new functions.https.HttpsError('internal', "The AI failed to discover businesses in the specified zone.", { detail: error.message });
+    }
+
+    // --- STEP 2: ENRICH BUSINESSES IN PARALLEL ---
+    const enrichmentSchema = {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING },
+            location: { type: Type.STRING },
+            phone: { type: Type.STRING },
+            email: { type: Type.STRING },
+            sourceUrl: { type: Type.STRING }
+        },
+        required: ["name", "location", "phone", "email", "sourceUrl"]
+    };
+
+    const enrichmentPromises = discoveredBusinesses.map(business => (async () => {
+        try {
+            const enrichmentPrompt = `Using Google Search, find detailed B2B contact info for this specific business: NAME: "${business.name}", CATEGORY: "${business.category}", located in "${zone}". Find its precise address, a contact phone number, an email address, and the source URL. If a field cannot be found, use "No detectado". Respond ONLY with a valid JSON object.`;
+            
+            const enrichResponse = await ai.models.generateContent({
+                model: 'gemini-3-pro-preview',
+                contents: enrichmentPrompt,
+                config: {
+                    systemInstruction: `You are a B2B data enrichment specialist. Your only output is a clean JSON object.`,
+                    tools: [{ googleSearch: {} }],
+                    temperature: 0.1,
+                    responseMimeType: "application/json",
+                    responseSchema: enrichmentSchema
+                }
+            });
+
+            const responseText = enrichResponse.text?.trim();
+            if (!responseText) return null;
+
+            let cleanResponseText = responseText;
+            if (cleanResponseText.startsWith('```json')) {
+                cleanResponseText = cleanResponseText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+            }
+            
+            const enrichedData = JSON.parse(cleanResponseText);
+            if (enrichedData && enrichedData.name) {
+                return {
+                    name: String(enrichedData.name || business.name).trim(),
+                    category: String(business.category).trim(),
+                    location: String(enrichedData.location || zone).trim(),
+                    phone: String(enrichedData.phone || '').replace(/No detectado/gi, '').trim() || '---',
+                    email: String(enrichedData.email || '').replace(/No detectado/gi, '').trim() || '---',
+                    sourceUrl: String(enrichedData.sourceUrl || '').trim(),
+                };
+            }
+            return null;
+
+        } catch (err) {
+            console.warn(`Enrichment failed for "${business.name}"`, err);
+            return null;
+        }
+    })());
+
+    const enrichmentResults = await Promise.all(enrichmentPromises);
+    const successfullyEnriched: Partial<Lead>[] = enrichmentResults.filter(Boolean) as Partial<Lead>[];
+
+    if (successfullyEnriched.length === 0) {
+        return { success: true, leads: [] };
+    }
+    
+    // --- STEP 3: CRM DUPLICATION CHECK (Batched) ---
+    const uniqueLeadNames = [...new Set(successfullyEnriched.map(l => l.name).filter(Boolean) as string[])];
+    const existingLeadsMap = new Map<string, Lead>();
+
+    if (uniqueLeadNames.length > 0) {
+      const chunkSize = 30;
+      for (let i = 0; i < uniqueLeadNames.length; i += chunkSize) {
+          const chunk = uniqueLeadNames.slice(i, i + chunkSize);
+          const snapshot = await db.collection('leads').where('name', 'in', chunk).get();
+          snapshot.docs.forEach(doc => {
+              const docData = doc.data();
+              if (docData && docData.name && typeof docData.name === 'string') {
+                  existingLeadsMap.set(docData.name.toLowerCase(), docData as Lead);
+              }
+          });
+      }
+    }
+
+    // --- STEP 4: FINAL FORMATTING ---
+    const finalLeads: Lead[] = successfullyEnriched.map((lead, index) => {
+        const existing = existingLeadsMap.get((lead.name || '').toLowerCase());
+        const crmStatus: Lead['crmStatus'] = existing
+            ? { status: existing.owner === currentUser ? 'owned' : 'locked', owner: existing.owner }
+            : { status: 'free' };
+
+        return {
+            ...lead,
+            id: `stream-${Date.now()}-${index}`,
+            status: 'frio',
+            owner: currentUser,
+            savedAt: Date.now(),
+            crmStatus,
+        } as Lead;
+    });
+
+    return { success: true, leads: finalLeads };
+});
+
 
 // --- TRIGGER: SEND EMAIL ON REPORT ---
-export const sendReportEmail = functions.firestore
-    .document('reports/{reportId}')
-    .onCreate(async (snap, context) => {
-      const report = snap.data();
-      
-      const mailOptions = {
-        from: `"Pompino System" <${gmailEmail}>`,
-        to: "hola@bzsgrupobebidas.com.ar",
-        subject: `🐞 Nuevo Reporte de Problema - ${report.user}`,
+export const sendReportEmail = functions.firestore.document('reports/{reportId}').onCreate(async (snap) => {
+    const reportData = snap.data();
+    if (!reportData) {
+        console.log("No data in report, skipping email.");
+        return;
+    }
+
+    const adminEmail = "hola@bzsgrupobebidas.com.ar";
+
+    const mailOptions = {
+        from: `"${reportData.user || 'Sistema'}" <${gmailEmail}>`,
+        to: adminEmail,
+        subject: `🐞 Nuevo Reporte de Sistema: ${reportData.message.substring(0, 30)}...`,
         html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-            <h2 style="color: #d12030;">Nuevo Reporte en Pompino</h2>
-            <p><strong>Usuario:</strong> ${report.user}</p>
-            <p><strong>Fecha:</strong> ${new Date(report.timestamp).toLocaleString()}</p>
-            <hr />
-            <p style="background: #f5f5f5; padding: 15px; border-left: 4px solid #d12030;">
-              ${report.message}
-            </p>
-            <hr />
-            <p style="font-size: 12px; color: #888;">Este es un mensaje automático del sistema BZS.</p>
-          </div>
+            <h1>Nuevo Reporte de Sistema</h1>
+            <p><strong>Usuario:</strong> ${reportData.user || 'Desconocido'}</p>
+            <p><strong>Fecha:</strong> ${new Date(reportData.timestamp).toLocaleString('es-AR')}</p>
+            <hr>
+            <h2>Mensaje:</h2>
+            <p style="white-space: pre-wrap; background-color: #f4f4f4; padding: 15px; border-radius: 5px;">${reportData.message}</p>
         `
-      };
-
-      try {
-        await mailTransport.sendMail(mailOptions);
-        console.log('Email de reporte enviado correctamente');
-        // Actualizar estado en DB
-        await snap.ref.update({ status: 'email_sent' });
-      } catch (error) {
-        console.error('Error enviando email:', error);
-        await snap.ref.update({ status: 'email_failed', error: String(error) });
-      }
-});
-
-
-// --- BIGQUERY ANALYTICS FUNCTIONS (EXISTING) ---
-
-const safeStringify = (obj: any) => {
-    const cache = new Set();
-    return JSON.stringify(obj, (key, value) => {
-        if (typeof value === 'object' && value !== null) {
-            if (cache.has(value)) return '[Circular]';
-            cache.add(value);
-        }
-        if (typeof value === 'bigint') return value.toString();
-        return value;
-    });
-};
-
-const cleanPayload = (data: any) => {
-    if (data === undefined) return null;
-    try {
-        return JSON.parse(safeStringify(data));
-    } catch (e) {
-        return { error: true, message: "Serialization Failed", originalError: String(e) };
-    }
-};
-
-const normalizeError = (err: any) => {
-    if (!err) return { message: "Unknown Error" };
-    let details = "No details";
-    try {
-        if (err.details) details = safeStringify(err.details);
-        else if (err.response) details = safeStringify(err.response);
-        else if (err.errors) details = safeStringify(err.errors); // BigQuery specific
-    } catch (e) {}
-    
-    return {
-        message: err.message || "Unknown Error",
-        code: err.code || 0,
-        details: details
     };
-};
 
-const getTableSuffix = (filter: string, customStart?: string, customEnd?: string) => {
-    const now = new Date();
-    const toBQFormat = (d: Date) => d.toISOString().split('T')[0].replace(/-/g, '');
-    
-    let start = new Date();
-    let end = new Date();
-
-    if (filter === 'yesterday') {
-        start.setDate(now.getDate() - 1);
-        end.setDate(now.getDate() - 1);
-    } else if (filter === '7d') {
-        start.setDate(now.getDate() - 7);
-    } else if (filter === '30d') {
-        start.setDate(now.getDate() - 30);
-    } else if (filter === 'custom' && customStart && customEnd) {
-        return { start: customStart.replace(/-/g, ''), end: customEnd.replace(/-/g, '') };
+    try {
+        await mailTransport.sendMail(mailOptions);
+        console.log('Report email sent successfully to:', adminEmail);
+    } catch (error) {
+        console.error('There was an error while sending the report email:', error);
     }
-    
-    return { start: toBQFormat(start), end: toBQFormat(end) };
-};
-
-export const getGa4Reports = functions.https.onCall(async (data: any, context: any) => {
-  let projectId = 'pompino-b2b';
-  try {
-     projectId = process.env.GCLOUD_PROJECT || 
-                 (admin.app().options.projectId) || 
-                 (process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG).projectId : 'pompino-b2b');
-  } catch (e) {
-     console.warn("Using default project ID");
-  }
-
-  try {
-      let { propertyId, dateFilter = '30d', customStart, customEnd, reportType = 'summary' } = data || {};
-      
-      if (!propertyId) propertyId = '375682540';
-      propertyId = propertyId.replace(/^p/, '');
-
-      const datasetId = `analytics_${propertyId}`;
-      const { start, end } = getTableSuffix(dateFilter, customStart, customEnd);
-      
-      const tableRef = `\`${projectId}.${datasetId}.events_*\``;
-      const whereClause = `_TABLE_SUFFIX BETWEEN '${start}' AND '${end}'`;
-
-      const bigquery = getBigQuery();
-
-      if (reportType === 'summary') {
-          const kpiQuery = `
-            SELECT
-                COUNT(DISTINCT user_pseudo_id) as users,
-                COUNT(DISTINCT CONCAT(user_pseudo_id, (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id'))) as sessions,
-                COUNTIF(event_name = 'add_to_cart') as carts,
-                COUNTIF(event_name = 'purchase') as purchases,
-                COALESCE(SUM(ecommerce.purchase_revenue), 0) as revenue
-            FROM ${tableRef}
-            WHERE ${whereClause}
-          `;
-
-          const productQuery = `
-             SELECT
-                item_name as name,
-                SUM(quantity) as quantity,
-                SUM(item_revenue) as revenue
-             FROM ${tableRef}, UNNEST(items)
-             WHERE ${whereClause}
-             GROUP BY 1
-             ORDER BY 3 DESC
-             LIMIT 25
-          `;
-
-          const [kpiRows] = await bigquery.query({ query: kpiQuery });
-          const [productRows] = await bigquery.query({ query: productQuery });
-
-          const kpis = kpiRows[0] || { users:0, sessions:0, carts:0, purchases:0, revenue:0 };
-          const conversionRate = kpis.sessions > 0 ? ((kpis.purchases / kpis.sessions) * 100).toFixed(2) : '0.00';
-
-          return cleanPayload({
-              success: true,
-              data: {
-                  kpis: { ...kpis, conversionRate: `${conversionRate}%` },
-                  topProducts: productRows,
-                  meta: { currency: 'USD' }
-              }
-          });
-
-      } else if (reportType === 'panoramic') {
-          const sourceQuery = `
-            SELECT 
-                (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'source') as name,
-                COUNT(DISTINCT CONCAT(user_pseudo_id, (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id'))) as value
-            FROM ${tableRef}
-            WHERE ${whereClause}
-            GROUP BY 1
-            ORDER BY 2 DESC
-            LIMIT 10
-          `;
-
-          const cityQuery = `
-            SELECT geo.city as name, COUNT(DISTINCT user_pseudo_id) as value
-            FROM ${tableRef}
-            WHERE ${whereClause}
-            GROUP BY 1
-            ORDER BY 2 DESC
-            LIMIT 10
-          `;
-
-          const deviceQuery = `
-             SELECT device.category as name, 
-             COUNT(DISTINCT CONCAT(user_pseudo_id, (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id'))) as value
-             FROM ${tableRef}
-             WHERE ${whereClause}
-             GROUP BY 1
-             ORDER BY 2 DESC
-          `;
-
-           const [sourceRows] = await bigquery.query({ query: sourceQuery });
-           const [cityRows] = await bigquery.query({ query: cityQuery });
-           const [deviceRows] = await bigquery.query({ query: deviceQuery });
-
-           const clean = (rows: any[]) => rows.map(r => ({ name: r.name || '(Not Set)', value: r.value }));
-
-           return cleanPayload({
-              success: true,
-              data: {
-                  sources: clean(sourceRows),
-                  cities: clean(cityRows),
-                  devices: clean(deviceRows),
-              }
-          });
-      }
-
-      return cleanPayload({ error: true, message: "Invalid report type" });
-
-  } catch (err: any) {
-      const normalized = normalizeError(err);
-      if (normalized.code === 404 || (normalized.message && normalized.message.includes("Not found"))) {
-           return cleanPayload({
-              error: true, 
-              message: "Datos no disponibles", 
-              userHint: "BigQuery no encontró tablas para este rango de fechas.",
-              originalError: normalized.message
-           });
-      }
-      return cleanPayload({ error: true, fatal: true, ...normalized });
-  }
 });

@@ -40,6 +40,15 @@ export interface Lead {
   
   // Multi-user ownership
   owner?: string; // Changed from literal union to string to support config file
+
+  // Server-side calculated status for scraped leads
+  crmStatus?: {
+    status: 'free' | 'owned' | 'locked';
+    owner?: string;
+  };
+  
+  // New Tagging System
+  tags?: string[];
 }
 
 export interface PipelineState {
@@ -71,23 +80,6 @@ export interface TransferRequest {
   toUser: User;   // Dueño actual
   status: 'pending' | 'accepted' | 'rejected';
   timestamp: number;
-}
-
-export interface ChatChannel {
-  id: string;
-  name: string;
-  createdBy: string;
-  isSystem: boolean; // true for default channels
-  members?: User[]; // Optional: if present, only these users can see/notify
-}
-
-export interface ChatMessage {
-  id: string;
-  text: string;
-  sender: User;
-  timestamp: number;
-  type: 'text' | 'system'; 
-  channelId?: string; // Optional for backward compatibility (defaults to 'general')
 }
 
 export interface DirectTask {

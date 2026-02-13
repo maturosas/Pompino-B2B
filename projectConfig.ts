@@ -1,4 +1,3 @@
-
 // --- CONFIGURACIÓN DEL PROYECTO (MODO PLANTILLA) ---
 // 📍 CAMBIAR AQUÍ: Edita estos valores para adaptar la app a tu nuevo negocio en segundos.
 
@@ -6,9 +5,6 @@ export const PROJECT_CONFIG = {
   // Identidad de la Marca
   appName: "POMPINO", // <- Pon el nombre de tu nueva app
   appSubtitle: "BZS Grupo Bebidas", // <- Tu subtítulo principal
-  
-  // Google Analytics (Measurement ID)
-  analyticsId: "G-EW9RBBT6VR",
   
   // Contexto Geográfico para la IA (Mejora la búsqueda)
   country: "Argentina", 

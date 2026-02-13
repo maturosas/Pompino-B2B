@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { User, DirectTask } from '../types';
 import { db, collection, setDoc, doc, updateDoc } from '../services/firebaseConfig';
+import { PROJECT_CONFIG } from '../projectConfig';
 
 interface ReportIssueModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ isOpen, onClose, cu
     try {
       const now = Date.now();
       const reportId = `report-${now}`;
+      const adminUser = PROJECT_CONFIG.users.find(u => u.role === 'admin')?.name || 'BZS';
       
       // 1. Save to Firestore (allows backend trigger/email extension to pick it up)
       await setDoc(doc(db, "reports", reportId), {
@@ -35,13 +37,13 @@ const ReportIssueModal: React.FC<ReportIssueModalProps> = ({ isOpen, onClose, cu
           status: 'new'
       });
 
-      // 2. Create In-App Notification for Admin (BZS)
+      // 2. Create In-App Notification for Admin
       // This ensures they see it even if email fails
       const taskId = `task-sys-${now}`;
       const notification: DirectTask = {
           id: taskId,
           fromUser: currentUser || 'Sistema',
-          toUser: 'BZS', // Hardcoded Admin
+          toUser: adminUser, // Dynamically get admin user
           message: `⚠️ REPORTE SISTEMA: ${issueText.substring(0, 50)}...`,
           status: 'pending',
           createdAt: now
